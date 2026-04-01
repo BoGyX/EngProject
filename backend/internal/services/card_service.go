@@ -190,11 +190,21 @@ func (s *CardService) UpdateCard(cardID int64, word string, translation string, 
 
 // DeleteCard удаляет card
 func (s *CardService) DeleteCard(cardID int64) error {
-	result, err := s.db.Exec(context.Background(),
+	ctx := context.Background()
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err = tx.Exec(ctx, "DELETE FROM training_answers WHERE card_id = $1", cardID); err != nil {
+		return err
+	}
+
+	result, err := tx.Exec(ctx,
 		"DELETE FROM cards WHERE id = $1",
 		cardID,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -203,5 +213,5 @@ func (s *CardService) DeleteCard(cardID int64) error {
 		return errors.New("card not found")
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }

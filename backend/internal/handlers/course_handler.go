@@ -18,6 +18,16 @@ func NewCourseHandler(courseService *services.CourseService) *CourseHandler {
 	return &CourseHandler{courseService: courseService}
 }
 
+func isAdminRequest(c *gin.Context) bool {
+	userRole, exists := c.Get("user_role")
+	if !exists {
+		return false
+	}
+
+	role, ok := userRole.(string)
+	return ok && role == "admin"
+}
+
 // CreateCourseRequest запрос на создание курса
 type CreateCourseRequest struct {
 	Title       string  `json:"title" binding:"required"`
@@ -49,10 +59,10 @@ type UpdateCourseRequest struct {
 func (h *CourseHandler) GetAllCourses(c *gin.Context) {
 	// Проверяем роль пользователя из контекста (если авторизован)
 	userRole, exists := c.Get("user_role")
-	
+
 	var courses []models.Course
 	var err error
-	
+
 	// Если пользователь авторизован и является админом, показываем все курсы
 	// Иначе - только опубликованные (для неавторизованных и обычных пользователей)
 	if exists && userRole == "admin" {
@@ -60,7 +70,7 @@ func (h *CourseHandler) GetAllCourses(c *gin.Context) {
 	} else {
 		courses, err = h.courseService.GetPublishedCourses()
 	}
-	
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

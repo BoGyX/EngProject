@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { config } from '../config'
 import { uploadService } from '../services/uploadService'
 
@@ -13,11 +13,63 @@ interface FileUploadProps {
 const IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
 const AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a']
 
+const isUploadedFilePath = (value?: string) => Boolean(value && value.startsWith('/uploads/'))
+
+const extractFileName = (value?: string) => {
+  if (!value) {
+    return ''
+  }
+
+  const normalizedValue = value.split('?')[0].split('#')[0]
+  const parts = normalizedValue.split('/').filter(Boolean)
+  return decodeURIComponent(parts[parts.length - 1] || '')
+}
+
 export default function FileUpload({ type, currentUrl, onUrlChange, label, placeholder }: FileUploadProps) {
   const [uploading, setUploading] = useState(false)
-  const [uploadMode, setUploadMode] = useState<'url' | 'file'>('url')
+  const [uploadMode, setUploadMode] = useState<'url' | 'file'>(() => (isUploadedFilePath(currentUrl) ? 'file' : 'url'))
+  const [selectedFileName, setSelectedFileName] = useState(() =>
+    isUploadedFilePath(currentUrl) ? extractFileName(currentUrl) : ''
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const lastChangeSourceRef = useRef<'external' | 'urlInput' | 'fileUpload'>('external')
+  const lastUploadedUrlRef = useRef('')
+  const lastUploadedNameRef = useRef('')
   const previewUrl = currentUrl ? config.getFullUrl(currentUrl) : ''
+
+  useEffect(() => {
+    const lastChangeSource = lastChangeSourceRef.current
+
+    if (!currentUrl) {
+      if (lastChangeSource !== 'urlInput') {
+        setUploadMode('url')
+      }
+      setSelectedFileName('')
+      lastUploadedUrlRef.current = ''
+      lastUploadedNameRef.current = ''
+      lastChangeSourceRef.current = 'external'
+      return
+    }
+
+    if (isUploadedFilePath(currentUrl)) {
+      if (lastChangeSource !== 'urlInput') {
+        setUploadMode('file')
+      }
+
+      if (currentUrl === lastUploadedUrlRef.current && lastUploadedNameRef.current) {
+        setSelectedFileName(lastUploadedNameRef.current)
+      } else {
+        setSelectedFileName(extractFileName(currentUrl))
+      }
+    } else {
+      if (lastChangeSource === 'external') {
+        setUploadMode('url')
+      }
+      setSelectedFileName('')
+    }
+
+    lastChangeSourceRef.current = 'external'
+  }, [currentUrl])
 
   const validateFile = (file: File) => {
     if (type === 'image') {
@@ -54,6 +106,11 @@ export default function FileUpload({ type, currentUrl, onUrlChange, label, place
       setUploading(true)
 
       const result = type === 'image' ? await uploadService.uploadImage(file) : await uploadService.uploadAudio(file)
+
+      lastChangeSourceRef.current = 'fileUpload'
+      lastUploadedUrlRef.current = result.url
+      lastUploadedNameRef.current = file.name
+      setSelectedFileName(file.name)
 
       // Store the relative uploads path so data survives domain or protocol changes.
       onUrlChange(result.url)
@@ -94,10 +151,13 @@ export default function FileUpload({ type, currentUrl, onUrlChange, label, place
 
       {uploadMode === 'url' ? (
         <input
-          type="url"
+          type="text"
           placeholder={placeholder}
           value={currentUrl || ''}
-          onChange={(event) => onUrlChange(event.target.value)}
+          onChange={(event) => {
+            lastChangeSourceRef.current = 'urlInput'
+            onUrlChange(event.target.value)
+          }}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm transition focus:border-link-light focus:outline-none focus:ring-2 focus:ring-link-light"
         />
       ) : (
@@ -115,6 +175,11 @@ export default function FileUpload({ type, currentUrl, onUrlChange, label, place
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm transition file:mr-4 file:rounded-lg file:border-0 file:bg-link-light file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-link-dark focus:border-link-light focus:outline-none focus:ring-2 focus:ring-link-light disabled:cursor-not-allowed disabled:opacity-50"
           />
           {uploading && <p className="mt-2 text-sm text-blue-600">Загрузка файла...</p>}
+          {selectedFileName && !uploading && (
+            <p className="mt-2 text-sm text-slate-600">
+              Текущий файл: <span className="font-medium">{selectedFileName}</span>
+            </p>
+          )}
           <p className="mt-1 text-xs text-gray-500">
             {type === 'image'
               ? 'Форматы: JPG, PNG, GIF, WEBP. Максимальный размер: 5 МБ.'

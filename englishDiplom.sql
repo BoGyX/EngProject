@@ -197,7 +197,7 @@ CREATE TABLE user_cards (
 CREATE TABLE training_sessions (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    course_id BIGINT REFERENCES courses(id),
+    course_id BIGINT REFERENCES courses(id) ON DELETE CASCADE,
     deck_id BIGINT REFERENCES decks(id), -- добавил deck для статистики по урокам
     user_deck_id BIGINT REFERENCES user_decks(id) ON DELETE CASCADE,
     started_at TIMESTAMP DEFAULT NOW(),
@@ -229,7 +229,7 @@ CREATE TABLE training_session_cards (
 CREATE TABLE training_answers (
     id BIGSERIAL PRIMARY KEY,
     session_id BIGINT REFERENCES training_sessions(id) ON DELETE CASCADE,
-    card_id BIGINT REFERENCES cards(id),
+    card_id BIGINT REFERENCES cards(id) ON DELETE CASCADE,
     is_correct BOOLEAN,
     answered_at TIMESTAMP DEFAULT NOW()
 );

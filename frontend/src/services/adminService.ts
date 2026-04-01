@@ -60,7 +60,7 @@ export interface CreateCardRequest {
 export const adminService = {
   // Courses
   async getAllCourses(): Promise<Course[]> {
-    const response = await api.get<Course[]>('/courses')
+    const response = await api.get<Course[]>('/admin/courses')
     return response.data
   },
 

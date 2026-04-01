@@ -180,11 +180,37 @@ func (s *CourseService) ensureUniqueSlug(ctx context.Context, requestedSlug stri
 
 // DeleteCourse удаляет курс
 func (s *CourseService) DeleteCourse(courseID int64) error {
-	result, err := s.db.Exec(context.Background(),
+	ctx := context.Background()
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err = tx.Exec(ctx,
+		`DELETE FROM training_answers ta
+		 USING cards c
+		 JOIN decks d ON d.id = c.deck_id
+		 WHERE ta.card_id = c.id
+		   AND d.course_id = $1`,
+		courseID,
+	); err != nil {
+		return err
+	}
+
+	if _, err = tx.Exec(ctx,
+		`DELETE FROM training_sessions
+		 WHERE course_id = $1
+		    OR deck_id IN (SELECT id FROM decks WHERE course_id = $1)`,
+		courseID,
+	); err != nil {
+		return err
+	}
+
+	result, err := tx.Exec(ctx,
 		"DELETE FROM courses WHERE id = $1",
 		courseID,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -193,5 +219,5 @@ func (s *CourseService) DeleteCourse(courseID int64) error {
 		return errors.New("course not found")
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }

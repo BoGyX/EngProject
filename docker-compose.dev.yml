@@ -1,0 +1,118 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: english_learning_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data_v2:/var/lib/postgresql/data
+      - ./englishDiplom.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - english_learning_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: english_learning_api
+    restart: unless-stopped
+    working_dir: /app
+    command: ["air", "-c", ".air.docker.toml"]
+    ports:
+      - "${API_PORT}:8000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS}
+      PORT: 8000
+      GIN_MODE: debug
+      MOODLE_ENABLED: ${MOODLE_ENABLED}
+      MOODLE_TEST_MODE: ${MOODLE_TEST_MODE}
+      MOODLE_BASE_URL: ${MOODLE_BASE_URL}
+      MOODLE_TOKEN: ${MOODLE_TOKEN}
+      MOODLE_SERVICE: ${MOODLE_SERVICE}
+      MOODLE_AUTO_CREATE: ${MOODLE_AUTO_CREATE}
+      MOODLE_ONLY_AUTH: ${MOODLE_ONLY_AUTH}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+      - backend_go_mod_cache:/go/pkg/mod
+      - backend_go_build_cache:/root/.cache/go-build
+    networks:
+      - english_learning_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: english_learning_frontend
+    restart: unless-stopped
+    working_dir: /app
+    command:
+      [
+        "sh",
+        "-c",
+        "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm ci; fi && npm run dev -- --host 0.0.0.0"
+      ]
+    ports:
+      - "${FRONTEND_PORT}:5173"
+    environment:
+      PORT: 5173
+      VITE_API_URL: /api
+      VITE_PROXY_TARGET: http://backend:8000
+      VITE_USE_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    networks:
+      - english_learning_network
+
+  adminer:
+    image: adminer:latest
+    container_name: english_learning_adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+    networks:
+      - english_learning_network
+
+volumes:
+  postgres_data_v2:
+  backend_go_mod_cache:
+  backend_go_build_cache:
+  frontend_node_modules:
+
+networks:
+  english_learning_network:
+    driver: bridge

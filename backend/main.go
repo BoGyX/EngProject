@@ -312,9 +312,9 @@ func main() {
 
 		// Courses endpoints (публичные - только чтение)
 		// Используем OptionalAuth чтобы админы видели все курсы, а пользователи - только опубликованные
-		api.GET("/courses", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAllCourses)
-		api.GET("/courses/by-slug/:slug", courseHandler.GetCourseBySlug)
-		api.GET("/courses/:id", courseHandler.GetCourseByID)
+		api.GET("/courses", courseHandler.GetPublishedCourses)
+		api.GET("/courses/by-slug/:slug", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseBySlug)
+		api.GET("/courses/:id", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseByID)
 
 		// Decks endpoints (публичные - только чтение)
 		api.GET("/decks", deckHandler.GetAllDecks)
@@ -406,6 +406,7 @@ func main() {
 		admin.Use(middleware.Admin())
 		{
 			// Admin Courses
+			admin.GET("/courses", courseHandler.GetAdminCourses)
 			admin.POST("/courses", courseHandler.CreateCourse)
 			admin.PUT("/courses/:id", courseHandler.UpdateCourse)
 			admin.DELETE("/courses/:id", courseHandler.DeleteCourse)

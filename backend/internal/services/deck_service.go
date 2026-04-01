@@ -189,11 +189,34 @@ func (s *DeckService) ensureUniqueSlug(ctx context.Context, courseID int64, requ
 
 // DeleteDeck удаляет deck
 func (s *DeckService) DeleteDeck(deckID int64) error {
-	result, err := s.db.Exec(context.Background(),
+	ctx := context.Background()
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err = tx.Exec(ctx,
+		`DELETE FROM training_answers ta
+		 USING cards c
+		 WHERE ta.card_id = c.id
+		   AND c.deck_id = $1`,
+		deckID,
+	); err != nil {
+		return err
+	}
+
+	if _, err = tx.Exec(ctx,
+		"DELETE FROM training_sessions WHERE deck_id = $1",
+		deckID,
+	); err != nil {
+		return err
+	}
+
+	result, err := tx.Exec(ctx,
 		"DELETE FROM decks WHERE id = $1",
 		deckID,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -202,5 +225,5 @@ func (s *DeckService) DeleteDeck(deckID int64) error {
 		return errors.New("deck not found")
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
