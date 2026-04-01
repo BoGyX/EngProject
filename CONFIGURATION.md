@@ -18,7 +18,7 @@ API_PORT=9090
 FRONTEND_PORT=3000
 FORCE_HTTPS_REDIRECT=false
 ALLOW_IFRAME_EMBED=true
-IFRAME_ANCESTORS=*
+IFRAME_ANCESTORS=
 
 # Adminer
 ADMINER_PORT=8080
@@ -69,8 +69,8 @@ MOODLE_ONLY_AUTH=true
 `ALLOW_IFRAME_EMBED` и `IFRAME_ANCESTORS`:
 
 - `ALLOW_IFRAME_EMBED=true` разрешает открывать приложение внутри `iframe`
-- `IFRAME_ANCESTORS=*` разрешает встраивание с любого домена
-- для продакшена лучше указать конкретный источник, например `IFRAME_ANCESTORS=https://portal.example.com`
+- пустой `IFRAME_ANCESTORS` снимает ограничения полностью
+- если нужно ограничить родительский сайт, укажите, например, `IFRAME_ANCESTORS=https://portal.example.com`
 
 ## Что важно для Moodle-only входа
 

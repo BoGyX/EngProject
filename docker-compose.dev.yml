@@ -28,7 +28,7 @@ services:
     container_name: english_learning_api
     restart: unless-stopped
     working_dir: /app
-    command: ["air", "-c", ".air.docker.toml"]
+    command: ["/go/bin/air", "-c", ".air.docker.toml"]
     ports:
       - "${API_PORT}:8000"
     environment:
@@ -87,7 +87,7 @@ services:
       VITE_USE_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       ALLOW_IFRAME_EMBED: ${ALLOW_IFRAME_EMBED:-true}
-      IFRAME_ANCESTORS: ${IFRAME_ANCESTORS:-*}
+      IFRAME_ANCESTORS: ${IFRAME_ANCESTORS:-}
     depends_on:
       - backend
     volumes:

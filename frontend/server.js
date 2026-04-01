@@ -7,7 +7,7 @@ const PORT = Number(process.env.PORT || 80)
 const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN || 'http://backend:8000'
 const FORCE_HTTPS_REDIRECT = String(process.env.FORCE_HTTPS_REDIRECT || 'false').toLowerCase() === 'true'
 const ALLOW_IFRAME_EMBED = String(process.env.ALLOW_IFRAME_EMBED || 'true').toLowerCase() === 'true'
-const IFRAME_ANCESTORS = (process.env.IFRAME_ANCESTORS || '*').trim() || '*'
+const IFRAME_ANCESTORS = (process.env.IFRAME_ANCESTORS || '').trim()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -58,7 +58,6 @@ function mergeFrameAncestorsDirective(existingPolicy, frameAncestors) {
     .filter(Boolean)
     .filter((directive) => !directive.toLowerCase().startsWith('frame-ancestors'))
 
-  directives.push(`frame-ancestors ${frameAncestors}`)
   return directives.join('; ')
 }
 
@@ -78,7 +77,14 @@ function applyFrameHeaders(headers) {
     return
   }
 
-  headers['Content-Security-Policy'] = mergeFrameAncestorsDirective(existingPolicy, IFRAME_ANCESTORS)
+  const mergedPolicy = mergeFrameAncestorsDirective(existingPolicy, IFRAME_ANCESTORS)
+  if (IFRAME_ANCESTORS) {
+    headers['Content-Security-Policy'] = mergedPolicy
+      ? `${mergedPolicy}; frame-ancestors ${IFRAME_ANCESTORS}`
+      : `frame-ancestors ${IFRAME_ANCESTORS}`
+  } else if (mergedPolicy) {
+    headers['Content-Security-Policy'] = mergedPolicy
+  }
 }
 
 function buildResponseHeaders(request, extraHeaders = {}) {
@@ -249,5 +255,5 @@ generateRuntimeConfig()
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Frontend server is listening on port ${PORT}`)
   console.log(`HTTPS redirect is ${FORCE_HTTPS_REDIRECT ? 'enabled' : 'disabled'}`)
-  console.log(`Iframe embedding is ${ALLOW_IFRAME_EMBED ? `enabled (${IFRAME_ANCESTORS})` : 'disabled'}`)
+  console.log(`Iframe embedding is ${ALLOW_IFRAME_EMBED ? (IFRAME_ANCESTORS ? `enabled (${IFRAME_ANCESTORS})` : 'fully open') : 'disabled'}`)
 })
