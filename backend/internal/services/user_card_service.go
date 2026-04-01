@@ -1,0 +1,317 @@
+package services
+
+import (
+	"context"
+	"english-learning/internal/models"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type UserCardService struct {
+	db *pgxpool.Pool
+}
+
+func NewUserCardService(db *pgxpool.Pool) *UserCardService {
+	return &UserCardService{db: db}
+}
+
+// GetAllUserCards возвращает все записи прогресса пользователей по карточкам
+func (s *UserCardService) GetAllUserCards() ([]models.UserCard, error) {
+	rows, err := s.db.Query(context.Background(),
+		`SELECT id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review, 
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false), 
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), 
+		 COALESCE(mode_constructor, false), COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at 
+		 FROM user_cards ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userCards []models.UserCard
+	for rows.Next() {
+		var uc models.UserCard
+		err := rows.Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+			&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+			&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+			&uc.CreatedAt, &uc.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		userCards = append(userCards, uc)
+	}
+
+	return userCards, rows.Err()
+}
+
+// GetUserCardByID возвращает прогресс по карточке по ID
+func (s *UserCardService) GetUserCardByID(id int64) (*models.UserCard, error) {
+	var uc models.UserCard
+	err := s.db.QueryRow(context.Background(),
+		`SELECT id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false), 
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), 
+		 COALESCE(mode_constructor, false), COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at 
+		 FROM user_cards WHERE id = $1`,
+		id,
+	).Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+		&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+		&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+		&uc.CreatedAt, &uc.UpdatedAt)
+
+	if err != nil {
+		return nil, errors.New("user card not found")
+	}
+
+	return &uc, nil
+}
+
+// GetUserCardsByUserID возвращает все карточки пользователя
+func (s *UserCardService) GetUserCardsByUserID(userID uuid.UUID) ([]models.UserCard, error) {
+	rows, err := s.db.Query(context.Background(),
+		`SELECT id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false), 
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), 
+		 COALESCE(mode_constructor, false), COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at 
+		 FROM user_cards WHERE user_id = $1 ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userCards []models.UserCard
+	for rows.Next() {
+		var uc models.UserCard
+		err := rows.Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+			&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+			&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+			&uc.CreatedAt, &uc.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		userCards = append(userCards, uc)
+	}
+
+	return userCards, rows.Err()
+}
+
+// CreateUserCard создает новую запись о прогрессе по карточке
+func (s *UserCardService) CreateUserCard(userID uuid.UUID, cardID int64, userDeckID *int64) (*models.UserCard, error) {
+	now := time.Now()
+	var uc models.UserCard
+	err := s.db.QueryRow(context.Background(),
+		`INSERT INTO user_cards (user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 mode_view, mode_choice, mode_with_photo, mode_without_photo, mode_russian, mode_constructor,
+		 current_mode, progress_percentage, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		 RETURNING id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false), 
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), 
+		 COALESCE(mode_constructor, false), COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at`,
+		userID, cardID, userDeckID, "new", 0, 0, false, false, false, false, false, false, "view", 0, now, now,
+	).Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+		&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+		&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+		&uc.CreatedAt, &uc.UpdatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &uc, nil
+}
+
+// UpdateUserCard обновляет прогресс пользователя по карточке
+func (s *UserCardService) UpdateUserCard(id int64, status string, correctCount int, wrongCount int, lastSeen *time.Time, nextReview *time.Time) (*models.UserCard, error) {
+	var uc models.UserCard
+	err := s.db.QueryRow(context.Background(),
+		`UPDATE user_cards 
+		 SET status = $1, correct_count = $2, wrong_count = $3, last_seen = $4, next_review = $5, updated_at = $6
+		 WHERE id = $7
+		 RETURNING id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false),
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), COALESCE(mode_constructor, false),
+		 COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at`,
+		status, correctCount, wrongCount, lastSeen, nextReview, time.Now(), id,
+	).Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+		&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+		&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+		&uc.CreatedAt, &uc.UpdatedAt)
+
+	if err != nil {
+		return nil, errors.New("user card not found")
+	}
+
+	return &uc, nil
+}
+
+// DeleteUserCard удаляет запись о прогрессе по карточке
+func (s *UserCardService) DeleteUserCard(id int64) error {
+	result, err := s.db.Exec(context.Background(),
+		"DELETE FROM user_cards WHERE id = $1",
+		id,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return errors.New("user card not found")
+	}
+
+	return nil
+}
+
+// UpdateUserCardWithModes обновляет прогресс пользователя по карточке включая режимы
+func (s *UserCardService) UpdateUserCardWithModes(id int64, status string, correctCount int, wrongCount int,
+	lastSeen *time.Time, nextReview *time.Time,
+	modeView *bool, modeChoice *bool, modeWithPhoto *bool, modeWithoutPhoto *bool, modeRussian *bool, modeConstructor *bool,
+	currentMode *string, progressPercentage *int) (*models.UserCard, error) {
+
+	query := `UPDATE user_cards 
+		 SET status = $1, correct_count = $2, wrong_count = $3, last_seen = $4, next_review = $5, updated_at = $6`
+	args := []interface{}{status, correctCount, wrongCount, lastSeen, nextReview, time.Now()}
+	argIndex := 7
+
+	if modeView != nil {
+		query += fmt.Sprintf(`, mode_view = $%d`, argIndex)
+		args = append(args, *modeView)
+		argIndex++
+	}
+	if modeChoice != nil {
+		query += fmt.Sprintf(`, mode_choice = $%d`, argIndex)
+		args = append(args, *modeChoice)
+		argIndex++
+	}
+	if modeWithPhoto != nil {
+		query += fmt.Sprintf(`, mode_with_photo = $%d`, argIndex)
+		args = append(args, *modeWithPhoto)
+		argIndex++
+	}
+	if modeWithoutPhoto != nil {
+		query += fmt.Sprintf(`, mode_without_photo = $%d`, argIndex)
+		args = append(args, *modeWithoutPhoto)
+		argIndex++
+	}
+	if modeRussian != nil {
+		query += fmt.Sprintf(`, mode_russian = $%d`, argIndex)
+		args = append(args, *modeRussian)
+		argIndex++
+	}
+	if modeConstructor != nil {
+		query += fmt.Sprintf(`, mode_constructor = $%d`, argIndex)
+		args = append(args, *modeConstructor)
+		argIndex++
+	}
+	if currentMode != nil {
+		query += fmt.Sprintf(`, current_mode = $%d`, argIndex)
+		args = append(args, *currentMode)
+		argIndex++
+	}
+	if progressPercentage != nil {
+		query += fmt.Sprintf(`, progress_percentage = $%d`, argIndex)
+		args = append(args, *progressPercentage)
+		argIndex++
+	}
+
+	query += fmt.Sprintf(` WHERE id = $%d`, argIndex)
+	args = append(args, id)
+	argIndex++
+
+	query += ` RETURNING id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false), 
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), 
+		 COALESCE(mode_constructor, false), COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at`
+
+	var uc models.UserCard
+	err := s.db.QueryRow(context.Background(), query, args...).Scan(
+		&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+		&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+		&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+		&uc.CreatedAt, &uc.UpdatedAt)
+
+	if err != nil {
+		return nil, errors.New("user card not found")
+	}
+
+	return &uc, nil
+}
+
+// CreateUserCardWithModes создает новую запись о прогрессе по карточке с режимами
+func (s *UserCardService) CreateUserCardWithModes(userID uuid.UUID, cardID int64, userDeckID *int64,
+	status string, correctCount int, wrongCount int,
+	modeView bool, modeChoice bool, modeWithPhoto bool, modeWithoutPhoto bool, modeRussian bool, modeConstructor bool,
+	currentMode string, progressPercentage int) (*models.UserCard, error) {
+
+	now := time.Now()
+	var uc models.UserCard
+
+	err := s.db.QueryRow(context.Background(),
+		`INSERT INTO user_cards (user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 mode_view, mode_choice, mode_with_photo, mode_without_photo, mode_russian, mode_constructor, current_mode, progress_percentage,
+		 created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		 RETURNING id, user_id, card_id, user_deck_id, status, correct_count, wrong_count, 
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false), 
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), 
+		 COALESCE(mode_constructor, false), COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at`,
+		userID, cardID, userDeckID, status, correctCount, wrongCount,
+		modeView, modeChoice, modeWithPhoto, modeWithoutPhoto, modeRussian, modeConstructor, currentMode, progressPercentage,
+		now, now,
+	).Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+		&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+		&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+		&uc.CreatedAt, &uc.UpdatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &uc, nil
+}
+
+func (s *UserCardService) GetUserCardByCardAndDeck(userID uuid.UUID, cardID int64, userDeckID *int64) (*models.UserCard, error) {
+	var uc models.UserCard
+	err := s.db.QueryRow(context.Background(),
+		`SELECT id, user_id, card_id, user_deck_id, status, correct_count, wrong_count,
+		 last_seen, next_review,
+		 COALESCE(mode_view, false), COALESCE(mode_choice, false), COALESCE(mode_with_photo, false),
+		 COALESCE(mode_without_photo, false), COALESCE(mode_russian, false), COALESCE(mode_constructor, false),
+		 COALESCE(current_mode, 'view'), COALESCE(progress_percentage, 0),
+		 created_at, updated_at
+		 FROM user_cards
+		 WHERE user_id = $1 AND card_id = $2 AND (($3::bigint IS NULL AND user_deck_id IS NULL) OR user_deck_id = $3)
+		 LIMIT 1`,
+		userID, cardID, userDeckID,
+	).Scan(&uc.ID, &uc.UserID, &uc.CardID, &uc.UserDeckID, &uc.Status,
+		&uc.CorrectCount, &uc.WrongCount, &uc.LastSeen, &uc.NextReview,
+		&uc.ModeView, &uc.ModeChoice, &uc.ModeWithPhoto, &uc.ModeWithoutPhoto, &uc.ModeRussian, &uc.ModeConstructor, &uc.CurrentMode, &uc.ProgressPercentage,
+		&uc.CreatedAt, &uc.UpdatedAt)
+	if err != nil {
+		return nil, errors.New("user card not found")
+	}
+
+	return &uc, nil
+}

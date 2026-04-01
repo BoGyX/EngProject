@@ -1,0 +1,15 @@
+./auth_handler.go
+./card_handler.go
+./course_handler.go
+./deck_handler.go
+./dictionary_handler.go
+./greeting.go
+./handlers.go
+./personal_vocabulary_handler.go
+./reading_text_handler.go
+./training_session_handler.go
+./upload_handler.go
+./user_card_handler.go
+./user_course_handler.go
+./user_deck_handler.go
+./user_handler.go

@@ -1,0 +1,13 @@
+package models
+
+import "time"
+
+type Deck struct {
+	ID          int64     `json:"id" db:"id"`
+	CourseID    int64     `json:"course_id" db:"course_id"`
+	Title       string    `json:"title" db:"title"`
+	Slug        string    `json:"slug" db:"slug"`
+	Description *string   `json:"description,omitempty" db:"description"`
+	Position    int       `json:"position" db:"position"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+}

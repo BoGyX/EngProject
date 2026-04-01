@@ -1,0 +1,12 @@
+./card_service.go
+./course_service.go
+./deck_service.go
+./dictionary_service.go
+./moodle_service.go
+./personal_vocabulary_service.go
+./reading_text_service.go
+./training_session_service.go
+./user_card_service.go
+./user_course_service.go
+./user_deck_service.go
+./user_service.go

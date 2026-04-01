@@ -1,0 +1,6 @@
+.env
+.air.toml
+tmp/
+*.log
+*.md
+.vscode

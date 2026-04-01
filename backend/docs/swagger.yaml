@@ -1,0 +1,2344 @@
+basePath: /api
+definitions:
+  handlers.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      user: {}
+    type: object
+  handlers.CreateCardRequest:
+    properties:
+      audio_url:
+        type: string
+      created_by:
+        description: UUID в виде строки
+        type: string
+      deck_id:
+        type: integer
+      example:
+        type: string
+      image_url:
+        type: string
+      is_custom:
+        type: boolean
+      phonetic:
+        type: string
+      translation:
+        type: string
+      word:
+        type: string
+    required:
+    - deck_id
+    - translation
+    - word
+    type: object
+  handlers.CreateCourseRequest:
+    properties:
+      created_by:
+        description: UUID в виде строки
+        type: string
+      description:
+        type: string
+      image_url:
+        type: string
+      is_published:
+        type: boolean
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  handlers.CreateDeckRequest:
+    properties:
+      course_id:
+        type: integer
+      description:
+        type: string
+      position:
+        type: integer
+      title:
+        type: string
+    required:
+    - course_id
+    - title
+    type: object
+  handlers.CreatePersonalVocabularyRequest:
+    properties:
+      audio_url:
+        type: string
+      example:
+        type: string
+      notes:
+        type: string
+      phonetic:
+        type: string
+      status:
+        description: '''new'', ''learning'', ''learned'''
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      translation:
+        type: string
+      user_id:
+        description: UUID в виде строки
+        type: string
+      word:
+        type: string
+    required:
+    - translation
+    - user_id
+    - word
+    type: object
+  handlers.CreateUserCardRequest:
+    properties:
+      card_id:
+        description: int64
+        type: integer
+      user_deck_id:
+        description: int64, опционально
+        type: integer
+      user_id:
+        description: UUID
+        type: string
+    required:
+    - card_id
+    - user_id
+    type: object
+  handlers.GetWordInfoResponse:
+    properties:
+      audio_url:
+        type: string
+      definition:
+        type: string
+      example:
+        type: string
+      meanings:
+        description: Все определения
+        items:
+          type: string
+        type: array
+      phonetic:
+        type: string
+      word:
+        type: string
+    type: object
+  handlers.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handlers.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  handlers.MoodleLoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        description: Может быть email или username
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  handlers.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  handlers.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handlers.StartCourseRequest:
+    properties:
+      course_id:
+        description: int64
+        type: integer
+      user_id:
+        description: UUID
+        type: string
+    required:
+    - course_id
+    - user_id
+    type: object
+  handlers.StartDeckRequest:
+    properties:
+      deck_id:
+        description: int64
+        type: integer
+      user_course_id:
+        description: int64, опционально
+        type: integer
+      user_id:
+        description: UUID
+        type: string
+    required:
+    - deck_id
+    - user_id
+    type: object
+  handlers.StartTrainingSessionRequest:
+    properties:
+      course_id:
+        description: int64, опционально
+        type: integer
+      deck_id:
+        description: int64, опционально
+        type: integer
+      user_id:
+        description: UUID, опционально
+        type: string
+    type: object
+  handlers.UpdateCardRequest:
+    properties:
+      audio_url:
+        type: string
+      example:
+        type: string
+      image_url:
+        type: string
+      phonetic:
+        type: string
+      translation:
+        type: string
+      word:
+        type: string
+    required:
+    - translation
+    - word
+    type: object
+  handlers.UpdateCourseRequest:
+    properties:
+      description:
+        type: string
+      image_url:
+        type: string
+      is_published:
+        type: boolean
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  handlers.UpdateDeckRequest:
+    properties:
+      description:
+        type: string
+      position:
+        type: integer
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  handlers.UpdatePersonalVocabularyRequest:
+    properties:
+      audio_url:
+        type: string
+      example:
+        type: string
+      notes:
+        type: string
+      phonetic:
+        type: string
+      status:
+        description: '''new'', ''learning'', ''learned'''
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      translation:
+        type: string
+      word:
+        type: string
+    required:
+    - translation
+    - word
+    type: object
+  handlers.UpdateStatsRequest:
+    properties:
+      is_correct:
+        type: boolean
+    required:
+    - is_correct
+    type: object
+  handlers.UpdateUserCardRequest:
+    properties:
+      correct_count:
+        type: integer
+      last_seen:
+        description: ISO 8601 timestamp
+        type: string
+      next_review:
+        description: ISO 8601 timestamp
+        type: string
+      status:
+        description: '''new'', ''learning'', ''learned'''
+        type: string
+      wrong_count:
+        type: integer
+    required:
+    - status
+    type: object
+  handlers.UpdateUserCourseRequest:
+    properties:
+      completed_decks_count:
+        type: integer
+      progress_percentage:
+        type: number
+      total_decks_count:
+        type: integer
+    type: object
+  handlers.UpdateUserDeckRequest:
+    properties:
+      learned_cards_count:
+        type: integer
+      progress_percentage:
+        type: number
+      status:
+        description: '''not_started'', ''in_progress'', ''completed'''
+        type: string
+      total_cards_count:
+        type: integer
+    required:
+    - status
+    type: object
+  models.Card:
+    properties:
+      audio_url:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deck_id:
+        type: integer
+      example:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      is_custom:
+        type: boolean
+      phonetic:
+        type: string
+      translation:
+        type: string
+      word:
+        type: string
+    type: object
+  models.Course:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      is_published:
+        type: boolean
+      title:
+        type: string
+    type: object
+  models.Deck:
+    properties:
+      course_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      position:
+        type: integer
+      title:
+        type: string
+    type: object
+  models.PersonalVocabulary:
+    properties:
+      audio_url:
+        type: string
+      correct_count:
+        type: integer
+      created_at:
+        type: string
+      example:
+        type: string
+      id:
+        type: integer
+      last_seen:
+        type: string
+      next_review:
+        type: string
+      notes:
+        type: string
+      phonetic:
+        type: string
+      status:
+        description: '''new'', ''learning'', ''learned'''
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      translation:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      word:
+        type: string
+      wrong_count:
+        type: integer
+    type: object
+  models.TrainingSession:
+    properties:
+      course_id:
+        type: integer
+      deck_id:
+        type: integer
+      finished_at:
+        type: string
+      id:
+        type: integer
+      started_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        description: '''user'' или ''admin'' (в БД)'
+        type: string
+      role_id:
+        description: 1 для user, 2 для admin (вычисляемое)
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.UserCard:
+    properties:
+      card_id:
+        type: integer
+      correct_count:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_seen:
+        type: string
+      next_review:
+        type: string
+      status:
+        description: '''new'', ''learning'', ''learned'''
+        type: string
+      updated_at:
+        type: string
+      user_deck_id:
+        type: integer
+      user_id:
+        type: string
+      wrong_count:
+        type: integer
+    type: object
+  models.UserCourse:
+    properties:
+      attempt_number:
+        type: integer
+      completed_at:
+        type: string
+      completed_decks_count:
+        type: integer
+      course_id:
+        type: integer
+      id:
+        type: integer
+      progress_percentage:
+        type: number
+      started_at:
+        type: string
+      total_decks_count:
+        type: integer
+      user_id:
+        type: string
+    type: object
+  models.UserDeck:
+    properties:
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      deck_id:
+        type: integer
+      id:
+        type: integer
+      learned_cards_count:
+        type: integer
+      progress_percentage:
+        type: number
+      started_at:
+        type: string
+      status:
+        description: '''not_started'', ''in_progress'', ''completed'''
+        type: string
+      total_cards_count:
+        type: integer
+      updated_at:
+        type: string
+      user_course_id:
+        type: integer
+      user_id:
+        type: string
+    type: object
+host: localhost:8000
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: API для платформы изучения английского языка. Используется Dictionary
+    API для получения данных о словах.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: English Learning Platform API
+  version: "1.0"
+paths:
+  /admin/cards/{id}:
+    delete:
+      description: Удаляет card из системы
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удалить card
+      tags:
+      - cards
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о card
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления card
+        in: body
+        name: card
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateCardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Card'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновить card
+      tags:
+      - cards
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Авторизация пользователя
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Вход
+      tags:
+      - auth
+  /auth/login/moodle:
+    post:
+      consumes:
+      - application/json
+      description: Авторизация пользователя через Moodle LMS
+      parameters:
+      - description: Данные для входа через Moodle
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MoodleLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Вход через Moodle
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Выход пользователя из системы (удаление refresh token)
+      parameters:
+      - description: Refresh token (опционально)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/handlers.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Выход
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Обновление access token используя refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить токен
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Создание нового аккаунта пользователя
+      parameters:
+      - description: Данные для регистрации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация
+      tags:
+      - auth
+  /auth/register/admin:
+    post:
+      consumes:
+      - application/json
+      description: Создание нового аккаунта администратора
+      parameters:
+      - description: Данные для регистрации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация администратора
+      tags:
+      - auth
+  /auth/register/moodle:
+    post:
+      consumes:
+      - application/json
+      description: Регистрация пользователя через Moodle LMS (проверяет учетные данные
+        и создает пользователя)
+      parameters:
+      - description: Данные для регистрации через Moodle
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MoodleLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация через Moodle
+      tags:
+      - auth
+  /cards:
+    get:
+      description: Возвращает список всех cards в системе или cards для конкретного
+        deck (если указан deck_id)
+      parameters:
+      - description: Deck ID для фильтрации cards
+        in: query
+        name: deck_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Card'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все cards
+      tags:
+      - cards
+    post:
+      consumes:
+      - application/json
+      description: Создает новый card в системе
+      parameters:
+      - description: Данные для создания card
+        in: body
+        name: card
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Card'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать card
+      tags:
+      - cards
+  /cards/{id}:
+    get:
+      description: Возвращает информацию о card по его ID
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Card'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить card по ID
+      tags:
+      - cards
+  /courses:
+    get:
+      description: Возвращает список всех курсов в системе. Админы видят все курсы,
+        пользователи - только опубликованные
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Course'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все курсы
+      tags:
+      - courses
+    post:
+      consumes:
+      - application/json
+      description: Создает новый курс в системе
+      parameters:
+      - description: Данные для создания курса
+        in: body
+        name: course
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCourseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Course'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать курс
+      tags:
+      - courses
+  /courses/{id}:
+    delete:
+      description: Удаляет курс из системы
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить курс
+      tags:
+      - courses
+    get:
+      description: Возвращает информацию о курсе по его ID
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Course'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить курс по ID
+      tags:
+      - courses
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о курсе
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления курса
+        in: body
+        name: course
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateCourseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Course'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить курс
+      tags:
+      - courses
+  /courses/{id}/publish:
+    post:
+      description: Переключает статус публикации курса (опубликован/черновик)
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Course'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Опубликовать/снять с публикации курс
+      tags:
+      - courses
+  /decks:
+    get:
+      description: Возвращает список всех decks в системе или decks для конкретного
+        курса (если указан course_id)
+      parameters:
+      - description: Course ID для фильтрации decks
+        in: query
+        name: course_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Deck'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все decks
+      tags:
+      - decks
+    post:
+      consumes:
+      - application/json
+      description: Создает новый deck в системе
+      parameters:
+      - description: Данные для создания deck
+        in: body
+        name: deck
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateDeckRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Deck'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать deck
+      tags:
+      - decks
+  /decks/{id}:
+    delete:
+      description: Удаляет deck из системы
+      parameters:
+      - description: Deck ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить deck
+      tags:
+      - decks
+    get:
+      description: Возвращает информацию о deck по его ID
+      parameters:
+      - description: Deck ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Deck'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить deck по ID
+      tags:
+      - decks
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о deck
+      parameters:
+      - description: Deck ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления deck
+        in: body
+        name: deck
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateDeckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Deck'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить deck
+      tags:
+      - decks
+  /dictionary/{word}:
+    get:
+      description: Получает информацию о слове из Free Dictionary API (определение,
+        фонетика, пример, аудио)
+      parameters:
+      - description: Слово для поиска
+        in: path
+        name: word
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.GetWordInfoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить информацию о слове
+      tags:
+      - dictionary
+  /greeting:
+    get:
+      description: Простой endpoint который возвращает приветствие
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить приветствие
+      tags:
+      - greeting
+  /training-sessions:
+    get:
+      description: Возвращает список всех сессий тренировок
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.TrainingSession'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все сессии тренировок
+      tags:
+      - training-sessions
+    post:
+      consumes:
+      - application/json
+      description: Создает новую сессию тренировки
+      parameters:
+      - description: Данные для начала сессии
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.StartTrainingSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.TrainingSession'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Начать сессию тренировки
+      tags:
+      - training-sessions
+  /training-sessions/{id}:
+    delete:
+      description: Удаляет сессию тренировки
+      parameters:
+      - description: Training Session ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить сессию тренировки
+      tags:
+      - training-sessions
+    get:
+      description: Возвращает информацию о сессии тренировки
+      parameters:
+      - description: Training Session ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TrainingSession'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить сессию тренировки по ID
+      tags:
+      - training-sessions
+  /training-sessions/{id}/finish:
+    put:
+      description: Завершает сессию тренировки, устанавливая finished_at
+      parameters:
+      - description: Training Session ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TrainingSession'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Завершить сессию тренировки
+      tags:
+      - training-sessions
+  /training-sessions/user/{user_id}:
+    get:
+      description: Возвращает список всех сессий тренировок конкретного пользователя
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.TrainingSession'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить сессии пользователя
+      tags:
+      - training-sessions
+  /user-cards:
+    get:
+      description: Возвращает список всех записей прогресса пользователей по карточкам
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserCard'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все записи прогресса по карточкам
+      tags:
+      - user-cards
+    post:
+      consumes:
+      - application/json
+      description: Создает новую запись о прогрессе пользователя по карточке
+      parameters:
+      - description: Данные для создания записи
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateUserCardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UserCard'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать запись о прогрессе по карточке
+      tags:
+      - user-cards
+  /user-cards/{id}:
+    delete:
+      description: Удаляет запись о прогрессе пользователя по карточке
+      parameters:
+      - description: User Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить прогресс по карточке
+      tags:
+      - user-cards
+    get:
+      description: Возвращает информацию о прогрессе пользователя по карточке
+      parameters:
+      - description: User Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserCard'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить прогресс по карточке по ID
+      tags:
+      - user-cards
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о прогрессе пользователя по карточке
+      parameters:
+      - description: User Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateUserCardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserCard'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить прогресс по карточке
+      tags:
+      - user-cards
+  /user-cards/user/{user_id}:
+    get:
+      description: Возвращает список всех карточек конкретного пользователя
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserCard'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить карточки пользователя
+      tags:
+      - user-cards
+  /user-courses:
+    get:
+      description: Возвращает список всех записей прогресса пользователей по курсам
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserCourse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все записи прогресса по курсам
+      tags:
+      - user-courses
+    post:
+      consumes:
+      - application/json
+      description: Создает новую запись о начале прохождения курса пользователем
+      parameters:
+      - description: Данные для начала курса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.StartCourseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UserCourse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Начать курс
+      tags:
+      - user-courses
+  /user-courses/{id}:
+    delete:
+      description: Удаляет запись о прогрессе пользователя по курсу
+      parameters:
+      - description: User Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить прогресс по курсу
+      tags:
+      - user-courses
+    get:
+      description: Возвращает информацию о прогрессе пользователя по курсу
+      parameters:
+      - description: User Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserCourse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить прогресс по курсу по ID
+      tags:
+      - user-courses
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о прогрессе пользователя по курсу
+      parameters:
+      - description: User Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateUserCourseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserCourse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить прогресс по курсу
+      tags:
+      - user-courses
+  /user-courses/user/{user_id}:
+    get:
+      description: Возвращает список всех курсов конкретного пользователя
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserCourse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить курсы пользователя
+      tags:
+      - user-courses
+  /user-decks:
+    get:
+      description: Возвращает список всех записей прогресса пользователей по декам
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserDeck'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все записи прогресса по декам
+      tags:
+      - user-decks
+    post:
+      consumes:
+      - application/json
+      description: Создает новую запись о начале прохождения деки пользователем
+      parameters:
+      - description: Данные для начала деки
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.StartDeckRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UserDeck'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Начать деку
+      tags:
+      - user-decks
+  /user-decks/{id}:
+    delete:
+      description: Удаляет запись о прогрессе пользователя по деку
+      parameters:
+      - description: User Deck ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить прогресс по деку
+      tags:
+      - user-decks
+    get:
+      description: Возвращает информацию о прогрессе пользователя по деку
+      parameters:
+      - description: User Deck ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserDeck'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить прогресс по деку по ID
+      tags:
+      - user-decks
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о прогрессе пользователя по деку
+      parameters:
+      - description: User Deck ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateUserDeckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserDeck'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить прогресс по деку
+      tags:
+      - user-decks
+  /user-decks/user/{user_id}:
+    get:
+      description: Возвращает список всех дек конкретного пользователя
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserDeck'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить деки пользователя
+      tags:
+      - user-decks
+  /users:
+    get:
+      description: Возвращает список всех пользователей системы
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+      summary: Получить список пользователей
+      tags:
+      - users
+  /users/{id}:
+    get:
+      description: Возвращает информацию о пользователе по его ID
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить пользователя по ID
+      tags:
+      - users
+  /vocabulary:
+    get:
+      description: Возвращает список всех слов в личном словаре или слова для конкретного
+        пользователя (если указан user_id)
+      parameters:
+      - description: User ID (UUID) для фильтрации слов
+        in: query
+        name: user_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.PersonalVocabulary'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить все слова личного словаря
+      tags:
+      - personal-vocabulary
+    post:
+      consumes:
+      - application/json
+      description: Создает новое слово в личном словаре пользователя
+      parameters:
+      - description: Данные для создания слова
+        in: body
+        name: vocabulary
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreatePersonalVocabularyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.PersonalVocabulary'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать слово в личном словаре
+      tags:
+      - personal-vocabulary
+  /vocabulary/{id}:
+    delete:
+      description: Удаляет слово из личного словаря пользователя
+      parameters:
+      - description: Vocabulary ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить слово из личного словаря
+      tags:
+      - personal-vocabulary
+    get:
+      description: Возвращает информацию о слове в личном словаре по его ID
+      parameters:
+      - description: Vocabulary ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PersonalVocabulary'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить слово по ID
+      tags:
+      - personal-vocabulary
+    put:
+      consumes:
+      - application/json
+      description: Обновляет информацию о слове в личном словаре
+      parameters:
+      - description: Vocabulary ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления слова
+        in: body
+        name: vocabulary
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePersonalVocabularyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PersonalVocabulary'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить слово в личном словаре
+      tags:
+      - personal-vocabulary
+  /vocabulary/{id}/stats:
+    put:
+      consumes:
+      - application/json
+      description: Обновляет счетчики правильных/неправильных ответов для слова
+      parameters:
+      - description: Vocabulary ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления статистики
+        in: body
+        name: stats
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateStatsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PersonalVocabulary'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить статистику слова
+      tags:
+      - personal-vocabulary
+  /vocabulary/review:
+    get:
+      description: Возвращает слова, которые нужно повторить (next_review <= now)
+      parameters:
+      - description: User ID (UUID)
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.PersonalVocabulary'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить слова для повторения
+      tags:
+      - personal-vocabulary
+swagger: "2.0"

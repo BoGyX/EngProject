@@ -1,0 +1,420 @@
+@startuml English Learning Platform - Class Diagram
+
+' Стили
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor<<Entity>> LightBlue
+    BackgroundColor<<Service>> LightGreen
+    BackgroundColor<<Handler>> LightYellow
+    BorderColor Black
+    ArrowColor Black
+}
+
+' ==================== ОСНОВНЫЕ СУЩНОСТИ ====================
+
+class User <<Entity>> {
+    - id: UUID
+    - email: String
+    - password_hash: String
+    - name: String
+    - role: String
+    - created_at: Timestamp
+    - updated_at: Timestamp
+    --
+    + GetRoleID(): int
+    + SetRoleID(roleID: int)
+}
+
+class RefreshToken <<Entity>> {
+    - id: BIGSERIAL
+    - user_id: UUID
+    - token: String
+    - expires_at: Timestamp
+    - created_at: Timestamp
+}
+
+class Course <<Entity>> {
+    - id: BIGSERIAL
+    - title: String
+    - description: String
+    - image_url: String
+    - is_published: Boolean
+    - created_by: UUID
+    - created_at: Timestamp
+}
+
+class Deck <<Entity>> {
+    - id: BIGSERIAL
+    - course_id: BIGINT
+    - title: String
+    - description: String
+    - position: Integer
+    - created_at: Timestamp
+}
+
+class Card <<Entity>> {
+    - id: BIGSERIAL
+    - deck_id: BIGINT
+    - word: String
+    - translation: String
+    - phonetic: String
+    - audio_url: String
+    - image_url: String
+    - example: String
+    - created_by: UUID
+    - is_custom: Boolean
+    - created_at: Timestamp
+}
+
+class PersonalVocabulary <<Entity>> {
+    - id: BIGSERIAL
+    - user_id: UUID
+    - word: String
+    - translation: String
+    - phonetic: String
+    - audio_url: String
+    - example: String
+    - notes: String
+    - tags: String[]
+    - status: String
+    - correct_count: Integer
+    - wrong_count: Integer
+    - last_seen: Timestamp
+    - next_review: Timestamp
+    - created_at: Timestamp
+    - updated_at: Timestamp
+}
+
+' ==================== ПРОГРЕСС ПОЛЬЗОВАТЕЛЯ ====================
+
+class UserCourse <<Entity>> {
+    - id: BIGSERIAL
+    - user_id: UUID
+    - course_id: BIGINT
+    - started_at: Timestamp
+    - completed_at: Timestamp
+    - attempt_number: Integer
+    - completed_decks_count: Integer
+    - total_decks_count: Integer
+    - progress_percentage: Float
+}
+
+class UserDeck <<Entity>> {
+    - id: BIGSERIAL
+    - user_id: UUID
+    - deck_id: BIGINT
+    - user_course_id: BIGINT
+    - status: String
+    - learned_cards_count: Integer
+    - total_cards_count: Integer
+    - progress_percentage: Float
+    - started_at: Timestamp
+    - completed_at: Timestamp
+    - created_at: Timestamp
+    - updated_at: Timestamp
+}
+
+class UserCard <<Entity>> {
+    - id: BIGSERIAL
+    - user_id: UUID
+    - card_id: BIGINT
+    - user_deck_id: BIGINT
+    - status: String
+    - correct_count: Integer
+    - wrong_count: Integer
+    - last_seen: Timestamp
+    - next_review: Timestamp
+    - created_at: Timestamp
+    - updated_at: Timestamp
+}
+
+class TrainingSession <<Entity>> {
+    - id: BIGSERIAL
+    - user_id: UUID
+    - course_id: BIGINT
+    - deck_id: BIGINT
+    - started_at: Timestamp
+    - finished_at: Timestamp
+}
+
+class TrainingAnswer <<Entity>> {
+    - id: BIGSERIAL
+    - session_id: BIGINT
+    - card_id: BIGINT
+    - is_correct: Boolean
+    - answered_at: Timestamp
+}
+
+' ==================== СВЯЗИ МЕЖДУ СУЩНОСТЯМИ ====================
+
+User "1" -- "0..*" RefreshToken : имеет >
+User "1" -- "0..*" Course : создает >
+User "1" -- "0..*" Card : создает >
+User "1" -- "0..*" PersonalVocabulary : владеет >
+User "1" -- "0..*" UserCourse : изучает >
+User "1" -- "0..*" UserDeck : проходит >
+User "1" -- "0..*" UserCard : учит >
+User "1" -- "0..*" TrainingSession : проводит >
+
+Course "1" -- "0..*" Deck : содержит >
+Deck "1" -- "0..*" Card : содержит >
+
+UserCourse "1" -- "0..*" UserDeck : включает >
+UserDeck "1" -- "0..*" UserCard : включает >
+
+Course "1" -- "0..*" UserCourse : изучается в >
+Deck "1" -- "0..*" UserDeck : изучается в >
+Card "1" -- "0..*" UserCard : изучается в >
+
+TrainingSession "1" -- "0..*" TrainingAnswer : содержит >
+TrainingSession "0..*" -- "0..1" Course : по курсу >
+TrainingSession "0..*" -- "0..1" Deck : по деке >
+TrainingAnswer "0..*" -- "0..1" Card : ответ на >
+
+' ==================== СЕРВИСЫ ====================
+
+class UserService <<Service>> {
+    + CreateUser(email, password, name): User
+    + CreateAdmin(email, password, name): User
+    + Authenticate(email, password): User
+    + GetUserByID(id): User
+    + GetUserByEmail(email): User
+    + UpdateUserRole(id, role): Error
+    + SaveRefreshToken(userID, token, duration): Error
+    + ValidateRefreshToken(token): UUID
+    + DeleteRefreshToken(token): Error
+}
+
+class CourseService <<Service>> {
+    + GetAllCourses(): []Course
+    + GetPublishedCourses(): []Course
+    + GetCourseByID(id): Course
+    + CreateCourse(title, description, imageURL, isPublished, createdBy): Course
+    + UpdateCourse(id, title, description, imageURL, isPublished): Course
+    + DeleteCourse(id): Error
+}
+
+class DeckService <<Service>> {
+    + GetAllDecks(): []Deck
+    + GetDecksByCourseID(courseID): []Deck
+    + GetDeckByID(id): Deck
+    + CreateDeck(courseID, title, description, position): Deck
+    + UpdateDeck(id, title, description, position): Deck
+    + DeleteDeck(id): Error
+}
+
+class CardService <<Service>> {
+    + GetAllCards(): []Card
+    + GetCardsByDeckID(deckID): []Card
+    + GetCardByID(id): Card
+    + CreateCard(deckID, word, translation, ...): Card
+    + UpdateCard(id, word, translation, ...): Card
+    + DeleteCard(id): Error
+}
+
+class PersonalVocabularyService <<Service>> {
+    + GetAllPersonalVocabulary(): []PersonalVocabulary
+    + GetPersonalVocabularyByUserID(userID): []PersonalVocabulary
+    + GetPersonalVocabularyByID(id): PersonalVocabulary
+    + GetPersonalVocabularyForReview(userID): []PersonalVocabulary
+    + CreatePersonalVocabulary(userID, word, ...): PersonalVocabulary
+    + UpdatePersonalVocabulary(id, word, ...): PersonalVocabulary
+    + UpdatePersonalVocabularyStats(id, isCorrect): PersonalVocabulary
+    + DeletePersonalVocabulary(id): Error
+}
+
+class UserCourseService <<Service>> {
+    + GetAllUserCourses(): []UserCourse
+    + GetUserCoursesByUserID(userID): []UserCourse
+    + GetUserCourseByID(id): UserCourse
+    + StartCourse(userID, courseID): UserCourse
+    + UpdateUserCourse(id, completedDecks, totalDecks, progress): UserCourse
+    + DeleteUserCourse(id): Error
+}
+
+class UserDeckService <<Service>> {
+    + GetUserDecksByUserID(userID): []UserDeck
+    + GetUserDeckByID(id): UserDeck
+    + StartDeck(userID, deckID, userCourseID): UserDeck
+    + UpdateUserDeck(id, status, learnedCards, totalCards, progress): UserDeck
+    + DeleteUserDeck(id): Error
+}
+
+class UserCardService <<Service>> {
+    + GetUserCardsByUserID(userID): []UserCard
+    + GetUserCardByID(id): UserCard
+    + StartCard(userID, cardID, userDeckID): UserCard
+    + UpdateUserCard(id, status, correctCount, wrongCount): UserCard
+    + DeleteUserCard(id): Error
+}
+
+class TrainingSessionService <<Service>> {
+    + GetAllTrainingSessions(): []TrainingSession
+    + GetTrainingSessionsByUserID(userID): []TrainingSession
+    + GetTrainingSessionByID(id): TrainingSession
+    + StartTrainingSession(userID, courseID, deckID): TrainingSession
+    + FinishTrainingSession(id): TrainingSession
+    + DeleteTrainingSession(id): Error
+}
+
+class MoodleService <<Service>> {
+    - baseURL: String
+    - token: String
+    - service: String
+    - testMode: Boolean
+    --
+    + Authenticate(username, password): MoodleAuthResult
+}
+
+class DictionaryService <<Service>> {
+    + GetWordInfo(word): WordInfo
+}
+
+' ==================== ОБРАБОТЧИКИ (HANDLERS) ====================
+
+class AuthHandler <<Handler>> {
+    - userService: UserService
+    - moodleService: MoodleService
+    - jwtSecret: String
+    - jwtExpiry: Integer
+    --
+    + Register(context): Response
+    + RegisterAdmin(context): Response
+    + RegisterMoodle(context): Response
+    + Login(context): Response
+    + LoginMoodle(context): Response
+    + RefreshToken(context): Response
+    + Logout(context): Response
+}
+
+class CourseHandler <<Handler>> {
+    - courseService: CourseService
+    --
+    + GetAllCourses(context): Response
+    + GetCourseByID(context): Response
+    + CreateCourse(context): Response
+    + UpdateCourse(context): Response
+    + DeleteCourse(context): Response
+    + PublishCourse(context): Response
+}
+
+class DeckHandler <<Handler>> {
+    - deckService: DeckService
+    --
+    + GetAllDecks(context): Response
+    + GetDeckByID(context): Response
+    + CreateDeck(context): Response
+    + UpdateDeck(context): Response
+    + DeleteDeck(context): Response
+}
+
+class CardHandler <<Handler>> {
+    - cardService: CardService
+    --
+    + GetAllCards(context): Response
+    + GetCardByID(context): Response
+    + CreateCard(context): Response
+    + UpdateCard(context): Response
+    + DeleteCard(context): Response
+}
+
+class PersonalVocabularyHandler <<Handler>> {
+    - vocabService: PersonalVocabularyService
+    --
+    + GetAllPersonalVocabulary(context): Response
+    + GetPersonalVocabularyByID(context): Response
+    + GetPersonalVocabularyForReview(context): Response
+    + CreatePersonalVocabulary(context): Response
+    + UpdatePersonalVocabulary(context): Response
+    + UpdatePersonalVocabularyStats(context): Response
+    + DeletePersonalVocabulary(context): Response
+}
+
+class UserCourseHandler <<Handler>> {
+    - userCourseService: UserCourseService
+    --
+    + GetAllUserCourses(context): Response
+    + GetUserCourseByID(context): Response
+    + GetUserCoursesByUserID(context): Response
+    + StartCourse(context): Response
+    + UpdateUserCourse(context): Response
+    + DeleteUserCourse(context): Response
+}
+
+class TrainingSessionHandler <<Handler>> {
+    - trainingSessionService: TrainingSessionService
+    --
+    + GetAllTrainingSessions(context): Response
+    + GetTrainingSessionByID(context): Response
+    + GetTrainingSessionsByUserID(context): Response
+    + StartTrainingSession(context): Response
+    + FinishTrainingSession(context): Response
+    + DeleteTrainingSession(context): Response
+}
+
+' ==================== СВЯЗИ СЕРВИСОВ И ОБРАБОТЧИКОВ ====================
+
+AuthHandler --> UserService : использует
+AuthHandler --> MoodleService : использует
+
+CourseHandler --> CourseService : использует
+DeckHandler --> DeckService : использует
+CardHandler --> CardService : использует
+PersonalVocabularyHandler --> PersonalVocabularyService : использует
+UserCourseHandler --> UserCourseService : использует
+TrainingSessionHandler --> TrainingSessionService : использует
+
+UserService --> User : управляет
+UserService --> RefreshToken : управляет
+CourseService --> Course : управляет
+DeckService --> Deck : управляет
+CardService --> Card : управляет
+PersonalVocabularyService --> PersonalVocabulary : управляет
+UserCourseService --> UserCourse : управляет
+UserDeckService --> UserDeck : управляет
+UserCardService --> UserCard : управляет
+TrainingSessionService --> TrainingSession : управляет
+TrainingSessionService --> TrainingAnswer : управляет
+
+' ==================== MIDDLEWARE ====================
+
+class AuthMiddleware <<Middleware>> {
+    + ValidateToken(context): Error
+    + ExtractUserID(context): UUID
+    + ExtractUserRole(context): String
+}
+
+class AdminMiddleware <<Middleware>> {
+    + CheckAdminRole(context): Error
+}
+
+class OptionalAuthMiddleware <<Middleware>> {
+    + ValidateTokenOptional(context): Error
+}
+
+AuthMiddleware ..> User : проверяет
+AdminMiddleware ..> User : проверяет роль
+
+note right of User
+  Основная сущность пользователя.
+  Роли: user, admin
+end note
+
+note right of Course
+  Курс содержит деки (уроки).
+  Может быть опубликован или в черновике.
+end note
+
+note right of PersonalVocabulary
+  Личный словарь пользователя
+  с отслеживанием прогресса
+  и интервальным повторением.
+end note
+
+note right of MoodleService
+  Интеграция с Moodle LMS.
+  Поддерживает тестовый режим
+  для разработки.
+end note
+
+@enduml
