@@ -3,13 +3,13 @@ FROM golang:1.23-alpine AS dev
 WORKDIR /app
 
 RUN apk add --no-cache git python3
-RUN go install github.com/cosmtrek/air@v1.49.0
-RUN go install github.com/swaggo/swag/cmd/swag@latest
+RUN GOBIN=/usr/local/bin go install github.com/cosmtrek/air@v1.49.0
+RUN GOBIN=/usr/local/bin go install github.com/swaggo/swag/cmd/swag@latest
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-CMD ["/go/bin/air", "-c", ".air.docker.toml"]
+CMD ["air", "-c", ".air.docker.toml"]
 
 FROM golang:1.23-alpine AS builder
 

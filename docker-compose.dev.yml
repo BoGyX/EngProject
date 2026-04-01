@@ -28,7 +28,7 @@ services:
     container_name: english_learning_api
     restart: unless-stopped
     working_dir: /app
-    command: ["/go/bin/air", "-c", ".air.docker.toml"]
+    command: ["air", "-c", ".air.docker.toml"]
     ports:
       - "${API_PORT}:8000"
     environment:
