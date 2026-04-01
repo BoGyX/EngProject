@@ -30,6 +30,8 @@ ENV PORT=80
 ENV VITE_API_URL=/api
 ENV BACKEND_ORIGIN=http://backend:8000
 ENV FORCE_HTTPS_REDIRECT=false
+ENV ALLOW_IFRAME_EMBED=true
+ENV IFRAME_ANCESTORS=*
 
 COPY package.json ./package.json
 COPY server.js ./server.js

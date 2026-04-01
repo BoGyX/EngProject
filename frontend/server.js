@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 const PORT = Number(process.env.PORT || 80)
 const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN || 'http://backend:8000'
 const FORCE_HTTPS_REDIRECT = String(process.env.FORCE_HTTPS_REDIRECT || 'false').toLowerCase() === 'true'
+const ALLOW_IFRAME_EMBED = String(process.env.ALLOW_IFRAME_EMBED || 'true').toLowerCase() === 'true'
+const IFRAME_ANCESTORS = (process.env.IFRAME_ANCESTORS || '*').trim() || '*'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -49,14 +51,45 @@ function getRequestHost(request) {
   return getForwardedValue(request.headers['x-forwarded-host']) || getForwardedValue(request.headers.host)
 }
 
+function mergeFrameAncestorsDirective(existingPolicy, frameAncestors) {
+  const directives = String(existingPolicy || '')
+    .split(';')
+    .map((directive) => directive.trim())
+    .filter(Boolean)
+    .filter((directive) => !directive.toLowerCase().startsWith('frame-ancestors'))
+
+  directives.push(`frame-ancestors ${frameAncestors}`)
+  return directives.join('; ')
+}
+
+function applyFrameHeaders(headers) {
+  delete headers['X-Frame-Options']
+  delete headers['x-frame-options']
+
+  const existingPolicy = headers['Content-Security-Policy'] || headers['content-security-policy']
+  delete headers['Content-Security-Policy']
+  delete headers['content-security-policy']
+
+  if (!ALLOW_IFRAME_EMBED) {
+    headers['X-Frame-Options'] = 'SAMEORIGIN'
+    if (existingPolicy) {
+      headers['Content-Security-Policy'] = existingPolicy
+    }
+    return
+  }
+
+  headers['Content-Security-Policy'] = mergeFrameAncestorsDirective(existingPolicy, IFRAME_ANCESTORS)
+}
+
 function buildResponseHeaders(request, extraHeaders = {}) {
   const headers = {
     'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'SAMEORIGIN',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     ...extraHeaders,
   }
+
+  applyFrameHeaders(headers)
 
   if (isSecureRequest(request)) {
     headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
@@ -216,4 +249,5 @@ generateRuntimeConfig()
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Frontend server is listening on port ${PORT}`)
   console.log(`HTTPS redirect is ${FORCE_HTTPS_REDIRECT ? 'enabled' : 'disabled'}`)
+  console.log(`Iframe embedding is ${ALLOW_IFRAME_EMBED ? `enabled (${IFRAME_ANCESTORS})` : 'disabled'}`)
 })

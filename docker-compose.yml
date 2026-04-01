@@ -86,6 +86,8 @@ services:
       VITE_PROXY_TARGET: http://backend:8000
       VITE_USE_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      ALLOW_IFRAME_EMBED: ${ALLOW_IFRAME_EMBED:-true}
+      IFRAME_ANCESTORS: ${IFRAME_ANCESTORS:-*}
     depends_on:
       - backend
     volumes:
