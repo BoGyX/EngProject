@@ -10,7 +10,7 @@ docker compose up --build -d
 
 ## Режим разработки без перезапуска контейнеров
 
-Для локальной разработки с bind mount и автоперезагрузкой backend/frontend:
+Для локальной разработки с bind mount:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
@@ -18,7 +18,7 @@ docker compose -f docker-compose.dev.yml up --build
 
 Что это дает:
 
-- `backend` запускается через `air` и пересобирается при изменении Go-файлов
+- `backend` запускается обычной командой `go run .`
 - `frontend` запускается через `vite` и подхватывает изменения без ручного рестарта
 - `uploads` и исходники монтируются из рабочей папки, поэтому изменения видны сразу
 
