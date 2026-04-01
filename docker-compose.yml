@@ -73,7 +73,7 @@ services:
       BACKEND_ORIGIN: http://backend:8000
       FORCE_HTTPS_REDIRECT: ${FORCE_HTTPS_REDIRECT:-false}
       ALLOW_IFRAME_EMBED: ${ALLOW_IFRAME_EMBED:-true}
-      IFRAME_ANCESTORS: ${IFRAME_ANCESTORS:-}
+      IFRAME_ANCESTORS: ${IFRAME_ANCESTORS:-https://lms.25-12.ru}
     depends_on:
       - backend
     networks:
