@@ -312,7 +312,7 @@ func main() {
 
 		// Courses endpoints (публичные - только чтение)
 		// Используем OptionalAuth чтобы админы видели все курсы, а пользователи - только опубликованные
-		api.GET("/courses", courseHandler.GetPublishedCourses)
+        api.GET("/courses", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAllCourses)
 		api.GET("/courses/by-slug/:slug", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseBySlug)
 		api.GET("/courses/:id", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseByID)
 

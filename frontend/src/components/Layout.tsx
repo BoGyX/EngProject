@@ -14,7 +14,7 @@ export default function Layout() {
   if (!isAuthenticated) return null
 
   return (
-    <div className="min-h-screen bg-bg-light">
+    <div className="app-shell min-h-screen bg-bg-light">
       <nav className="bg-card-light shadow-md border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -69,7 +69,7 @@ export default function Layout() {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="flex-1 max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <Outlet />
       </main>
       <WordTranslator />
