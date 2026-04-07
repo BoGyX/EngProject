@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"archive/zip"
 	"encoding/csv"
+	"encoding/xml"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,7 +20,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/xuri/excelize/v2"
 )
 
 type importedCourseRow struct {
@@ -30,6 +33,46 @@ type importCourseResponse struct {
 	Course       *models.Course `json:"course"`
 	LessonsCount int            `json:"lessons_count"`
 	CardsCount   int            `json:"cards_count"`
+}
+
+type xlsxWorkbook struct {
+	Sheets []struct {
+		Name string `xml:"name,attr"`
+		ID   string `xml:"id,attr"`
+		RID  string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
+	} `xml:"sheets>sheet"`
+}
+
+type xlsxRelationships struct {
+	Items []struct {
+		ID     string `xml:"Id,attr"`
+		Target string `xml:"Target,attr"`
+	} `xml:"Relationship"`
+}
+
+type xlsxSharedStrings struct {
+	Items []struct {
+		Text string `xml:"t"`
+		Runs []struct {
+			Text string `xml:"t"`
+		} `xml:"r"`
+	} `xml:"si"`
+}
+
+type xlsxWorksheet struct {
+	Rows []struct {
+		Cells []struct {
+			Reference string `xml:"r,attr"`
+			Type      string `xml:"t,attr"`
+			Value     string `xml:"v"`
+			Inline    struct {
+				Text string `xml:"t"`
+				Runs []struct {
+					Text string `xml:"t"`
+				} `xml:"r"`
+			} `xml:"is"`
+		} `xml:"c"`
+	} `xml:"sheetData>row"`
 }
 
 func normalizeImportHeaderValue(value string) string {
@@ -131,46 +174,209 @@ func parseImportedCourseCSV(file multipart.File, delimiter rune) ([]importedCour
 	return rows, nil
 }
 
-func parseImportedCourseExcel(file multipart.File) ([]importedCourseRow, error) {
-	workbook, err := excelize.OpenReader(file)
+func readZipFile(reader *zip.Reader, name string) ([]byte, error) {
+	for _, file := range reader.File {
+		if file.Name != name {
+			continue
+		}
+
+		rc, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+
+		return io.ReadAll(rc)
+	}
+
+	return nil, fmt.Errorf("xlsx entry not found: %s", name)
+}
+
+func cellReferenceToIndex(reference string) int {
+	if reference == "" {
+		return -1
+	}
+
+	letters := make([]rune, 0, len(reference))
+	for _, char := range reference {
+		if char >= 'A' && char <= 'Z' {
+			letters = append(letters, char)
+			continue
+		}
+		if char >= 'a' && char <= 'z' {
+			letters = append(letters, char-32)
+			continue
+		}
+		break
+	}
+
+	if len(letters) == 0 {
+		return -1
+	}
+
+	index := 0
+	for _, char := range letters {
+		index = index*26 + int(char-'A'+1)
+	}
+
+	return index - 1
+}
+
+func sharedStringValue(sharedStrings []string, rawValue string) string {
+	index, err := strconv.Atoi(strings.TrimSpace(rawValue))
+	if err != nil || index < 0 || index >= len(sharedStrings) {
+		return ""
+	}
+
+	return sharedStrings[index]
+}
+
+func parseXLSXSharedStrings(reader *zip.Reader) ([]string, error) {
+	data, err := readZipFile(reader, "xl/sharedStrings.xml")
+	if err != nil {
+		return []string{}, nil
+	}
+
+	var shared xlsxSharedStrings
+	if err := xml.Unmarshal(data, &shared); err != nil {
+		return nil, err
+	}
+
+	values := make([]string, 0, len(shared.Items))
+	for _, item := range shared.Items {
+		if item.Text != "" {
+			values = append(values, item.Text)
+			continue
+		}
+
+		var builder strings.Builder
+		for _, run := range item.Runs {
+			builder.WriteString(run.Text)
+		}
+		values = append(values, builder.String())
+	}
+
+	return values, nil
+}
+
+func resolveXLSXFirstSheetPath(reader *zip.Reader) (string, error) {
+	workbookData, err := readZipFile(reader, "xl/workbook.xml")
+	if err != nil {
+		return "", err
+	}
+
+	var workbook xlsxWorkbook
+	if err := xml.Unmarshal(workbookData, &workbook); err != nil {
+		return "", err
+	}
+
+	if len(workbook.Sheets) == 0 {
+		return "", fmt.Errorf("spreadsheet has no sheets")
+	}
+
+	relationshipsData, err := readZipFile(reader, "xl/_rels/workbook.xml.rels")
+	if err != nil {
+		return "", err
+	}
+
+	var relationships xlsxRelationships
+	if err := xml.Unmarshal(relationshipsData, &relationships); err != nil {
+		return "", err
+	}
+
+	firstSheetRelationshipID := workbook.Sheets[0].RID
+	for _, relationship := range relationships.Items {
+		if relationship.ID != firstSheetRelationshipID {
+			continue
+		}
+
+		target := relationship.Target
+		if strings.HasPrefix(target, "/") {
+			return strings.TrimPrefix(target, "/"), nil
+		}
+
+		return path.Clean(path.Join("xl", target)), nil
+	}
+
+	return "", fmt.Errorf("first sheet relationship not found")
+}
+
+func parseImportedCourseExcel(file multipart.File, size int64) ([]importedCourseRow, error) {
+	reader, err := zip.NewReader(file, size)
 	if err != nil {
 		return nil, err
 	}
-	defer workbook.Close()
 
-	sheets := workbook.GetSheetList()
-	if len(sheets) == 0 {
-		return nil, fmt.Errorf("spreadsheet has no sheets")
-	}
-
-	rowsData, err := workbook.GetRows(sheets[0])
+	sharedStrings, err := parseXLSXSharedStrings(reader)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]importedCourseRow, 0, len(rowsData))
+	sheetPath, err := resolveXLSXFirstSheetPath(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	sheetData, err := readZipFile(reader, sheetPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var worksheet xlsxWorksheet
+	if err := xml.Unmarshal(sheetData, &worksheet); err != nil {
+		return nil, err
+	}
+
 	seen := make(map[string]struct{})
+	rows := make([]importedCourseRow, 0, len(worksheet.Rows))
 
-	for index, record := range rowsData {
-		row, skip, err := parseImportedCourseColumns(record, index+1, seen)
+	for rowIndex, row := range worksheet.Rows {
+		columns := make([]string, 4)
+		for _, cell := range row.Cells {
+			index := cellReferenceToIndex(cell.Reference)
+			if index < 0 || index > 3 {
+				continue
+			}
+
+			value := cell.Value
+			switch cell.Type {
+			case "s":
+				value = sharedStringValue(sharedStrings, cell.Value)
+			case "inlineStr":
+				if cell.Inline.Text != "" {
+					value = cell.Inline.Text
+				} else {
+					var builder strings.Builder
+					for _, run := range cell.Inline.Runs {
+						builder.WriteString(run.Text)
+					}
+					value = builder.String()
+				}
+			}
+
+			columns[index] = strings.TrimSpace(value)
+		}
+
+		parsedRow, skip, err := parseImportedCourseColumns(columns, rowIndex+1, seen)
 		if err != nil {
 			return nil, err
 		}
 		if skip {
 			continue
 		}
-		rows = append(rows, *row)
+
+		rows = append(rows, *parsedRow)
 	}
 
 	return rows, nil
 }
 
-func parseImportedCourseFile(file multipart.File, filename string) ([]importedCourseRow, error) {
+func parseImportedCourseFile(file multipart.File, size int64, filename string) ([]importedCourseRow, error) {
 	extension := strings.ToLower(filepath.Ext(filename))
 
 	switch extension {
-	case ".xlsx", ".xlsm", ".xltx", ".xltm":
-		return parseImportedCourseExcel(file)
+	case ".xlsx":
+		return parseImportedCourseExcel(file, size)
 	case ".csv":
 		return parseImportedCourseCSV(file, ',')
 	case ".tsv", ".txt":
@@ -252,7 +458,7 @@ func (h *CourseHandler) CreateCourseFromImport(c *gin.Context) {
 	}
 	defer file.Close()
 
-	rows, err := parseImportedCourseFile(file, fileHeader.Filename)
+	rows, err := parseImportedCourseFile(file, fileHeader.Size, fileHeader.Filename)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
