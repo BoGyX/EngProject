@@ -4,7 +4,6 @@ import { config } from '../config'
 import api from '../services/api'
 import { dictionaryService } from '../services/dictionaryService'
 import { Course, Deck, studyService } from '../services/studyService'
-import { uploadService } from '../services/uploadService'
 
 interface ReadingText {
   id: number
@@ -142,15 +141,6 @@ function pickPreferredVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoic
   return voicePool[0] || null
 }
 
-function getUploadedAudioFilename(audioUrl: string): string | null {
-  if (!audioUrl || !audioUrl.includes('/uploads/audio/')) {
-    return null
-  }
-
-  const segments = audioUrl.split('/')
-  return segments[segments.length - 1] || null
-}
-
 export default function ReaderTextPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -159,7 +149,6 @@ export default function ReaderTextPage() {
   const [wordTranslation, setWordTranslation] = useState<WordTranslation | null>(null)
   const [loadingTranslation, setLoadingTranslation] = useState(false)
   const [addingWord, setAddingWord] = useState(false)
-  const [audioUpdating, setAudioUpdating] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isUploadedAudioPlaying, setIsUploadedAudioPlaying] = useState(false)
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
@@ -474,58 +463,6 @@ export default function ReaderTextPage() {
     speakText(wordTranslation.word)
   }
 
-  const handleReplaceUploadedAudio = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    const input = event.target
-
-    if (!file || !text) {
-      return
-    }
-
-    const userId = getUserId()
-    if (!userId) {
-      setReaderMessage('Пользователь не авторизован.')
-      input.value = ''
-      return
-    }
-
-    const previousFilename = getUploadedAudioFilename(text.audio_url)
-    let uploadedAudio: { url: string; filename: string } | null = null
-
-    try {
-      setAudioUpdating(true)
-      setReaderMessage(null)
-
-      uploadedAudio = await uploadService.uploadAudio(file)
-
-      const response = await api.put<ReadingText>(`/reading-texts/${text.id}/audio`, {
-        user_id: userId,
-        audio_url: uploadedAudio.url,
-      })
-
-      setText(response.data)
-      setReaderMessage('Своя озвучка сохранена.')
-
-      if (previousFilename && previousFilename !== uploadedAudio.filename) {
-        void uploadService.deleteFile('audio', previousFilename).catch((cleanupError) => {
-          console.error('Error deleting old uploaded audio:', cleanupError)
-        })
-      }
-    } catch (error) {
-      if (uploadedAudio?.filename) {
-        void uploadService.deleteFile('audio', uploadedAudio.filename).catch((cleanupError) => {
-          console.error('Error deleting new uploaded audio after failed update:', cleanupError)
-        })
-      }
-
-      console.error('Error updating uploaded audio:', error)
-      setReaderMessage('Не удалось сохранить свою озвучку.')
-    } finally {
-      setAudioUpdating(false)
-      input.value = ''
-    }
-  }
-
   const handleAddToDictionary = async () => {
     if (!wordTranslation) return
 
@@ -693,27 +630,6 @@ export default function ReaderTextPage() {
 
           <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-text-light">Своя озвучка</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  {uploadedAudioUrl ? 'Заменить mp3' : 'Загрузить mp3'}
-                </span>
-                <input
-                  type="file"
-                  accept=".mp3,audio/*"
-                  onChange={handleReplaceUploadedAudio}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:border-link-light focus:outline-none"
-                  disabled={audioUpdating}
-                />
-              </label>
-
-              {audioUpdating && (
-                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-800">
-                  Сохраняю аудио...
-                </div>
-              )}
-            </div>
-
             {uploadedAudioUrl ? (
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-800">

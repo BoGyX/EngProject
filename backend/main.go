@@ -339,7 +339,6 @@ func main() {
 		api.GET("/reading-texts", readingTextHandler.GetAllReadingTexts)
 		api.GET("/reading-texts/:id", readingTextHandler.GetReadingTextByID)
 		api.POST("/reading-texts", readingTextHandler.CreateReadingText)
-		api.PUT("/reading-texts/:id/audio", readingTextHandler.UpdateReadingTextAudio)
 		api.DELETE("/reading-texts/:id", readingTextHandler.DeleteReadingText)
 
 		// User Courses endpoints (прогресс пользователя по курсам)
