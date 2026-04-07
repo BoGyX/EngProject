@@ -22,6 +22,29 @@ function normalizeProgress(value?: number) {
   return Math.max(0, Math.min(100, Math.round(Number(value || 0))))
 }
 
+function hasUsableAccessToken(token?: string | null) {
+  if (!token) {
+    return false
+  }
+
+  const tokenParts = token.split('.')
+  if (tokenParts.length < 2) {
+    return true
+  }
+
+  try {
+    const normalizedPayload = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decodedPayload = JSON.parse(atob(normalizedPayload))
+    if (typeof decodedPayload.exp === 'number') {
+      return decodedPayload.exp * 1000 > Date.now() + 5000
+    }
+  } catch (error) {
+    console.warn('Failed to parse access token expiration:', error)
+  }
+
+  return true
+}
+
 function sortUserDecks(userDecks: UserDeck[]) {
   return [...userDecks].sort((left, right) => {
     const leftValue = new Date(left.updated_at || left.created_at || left.last_opened_at || 0).getTime()
@@ -93,7 +116,7 @@ function buildDeckPresentations(
 
 export default function CourseDeckPage() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { user, accessToken, isAuthenticated } = useAuthStore()
   const { id, courseSlug, deckSlug } = useParams<{
     id?: string
     courseSlug?: string
@@ -146,9 +169,11 @@ export default function CourseDeckPage() {
     }
   }, [deckPresentations])
 
+  const canUseProtectedStudyActions = Boolean(isAuthenticated && hasUsableAccessToken(accessToken))
+
   useEffect(() => {
     void loadCourseData()
-  }, [id, courseSlug, deckSlug, user?.id])
+  }, [id, courseSlug, deckSlug, user?.id, canUseProtectedStudyActions])
 
   const loadCards = async (deckId: number) => {
     try {
@@ -179,19 +204,21 @@ export default function CourseDeckPage() {
 
       setCourse(loadedCourse)
 
-      try {
-        await studyService.activateCourse(loadedCourse.id)
-      } catch (error) {
-        console.error('Error activating course:', error)
+      if (canUseProtectedStudyActions) {
+        try {
+          await studyService.activateCourse(loadedCourse.id)
+        } catch (error) {
+          console.error('Error activating course:', error)
+        }
       }
 
       const loadedDecks = await studyService.getDecksByCourse(loadedCourse.id)
       setDecks(loadedDecks)
 
       const [nextActiveCourse, nextActiveDeck, nextUserDecks] = await Promise.all([
-        studyService.getActiveCourse().catch(() => null),
-        studyService.getActiveDeck().catch(() => null),
-        user?.id ? studyService.getUserDecks(user.id).catch(() => []) : Promise.resolve([]),
+        canUseProtectedStudyActions ? studyService.getActiveCourse().catch(() => null) : Promise.resolve(null),
+        canUseProtectedStudyActions ? studyService.getActiveDeck().catch(() => null) : Promise.resolve(null),
+        canUseProtectedStudyActions && user?.id ? studyService.getUserDecks(user.id).catch(() => []) : Promise.resolve([]),
       ])
 
       setActiveCourse(nextActiveCourse)
@@ -239,7 +266,7 @@ export default function CourseDeckPage() {
   }
 
   const refreshScopedUserDecks = async (courseDecks: Deck[]) => {
-    if (!user?.id) return
+    if (!canUseProtectedStudyActions || !user?.id) return
 
     try {
       const nextUserDecks = await studyService.getUserDecks(user.id)
@@ -268,7 +295,8 @@ export default function CourseDeckPage() {
     setSelectionMessage(null)
     setSelectedDeck(deck)
 
-    try {
+    if (canUseProtectedStudyActions) {
+      try {
       const nextActiveDeck = await studyService.activateDeck(deck.id)
       setActiveDeck(nextActiveDeck)
       if (loadedCourse?.id) {
@@ -279,10 +307,11 @@ export default function CourseDeckPage() {
         }
       }
       await refreshScopedUserDecks(scopedDecks)
-    } catch (error: any) {
+      } catch (error: any) {
       console.error('Error activating deck:', error)
       setSelectionMessage(error?.response?.data?.error || 'Не удалось открыть дек.')
       return
+    }
     }
 
     await loadCards(deck.id)
