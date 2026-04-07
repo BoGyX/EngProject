@@ -22,6 +22,7 @@ export interface Deck {
 export interface Card {
   id: number
   deck_id: number
+  position: number
   word: string
   translation: string
   phonetic?: string
@@ -48,6 +49,7 @@ export interface CreateDeckRequest {
 
 export interface CreateCardRequest {
   deck_id: number
+  position?: number
   word: string
   translation: string
   phonetic?: string

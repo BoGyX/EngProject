@@ -51,6 +51,7 @@ CREATE TABLE decks (
 CREATE TABLE cards (
     id BIGSERIAL PRIMARY KEY,
     deck_id BIGINT REFERENCES decks(id) ON DELETE CASCADE,
+    position INT DEFAULT 0,
     
     word TEXT NOT NULL,
     translation TEXT NOT NULL,
@@ -265,6 +266,7 @@ CREATE INDEX idx_courses_slug ON courses(slug);
 CREATE INDEX idx_decks_course ON decks(course_id);
 CREATE INDEX idx_decks_course_slug ON decks(course_id, slug);
 CREATE INDEX idx_cards_deck ON cards(deck_id);
+CREATE INDEX idx_cards_deck_position ON cards(deck_id, position);
 CREATE INDEX idx_cards_created_by ON cards(created_by);
 CREATE INDEX idx_cards_is_custom ON cards(is_custom);
 CREATE UNIQUE INDEX idx_cards_custom_user_deck_word ON cards (deck_id, created_by, LOWER(word))

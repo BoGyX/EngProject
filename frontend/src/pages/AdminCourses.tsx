@@ -1,12 +1,150 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { adminService, Course, CreateCourseRequest } from '../services/adminService'
 import { useAuthStore } from '../store/authStore'
 import { uploadService } from '../services/uploadService'
 import { config } from '../config'
 import { slugify } from '../utils/slug'
+import { dictionaryService } from '../services/dictionaryService'
+
+interface ImportedSheetRow {
+  lesson: number
+  position: number
+  word: string
+  translation: string
+}
+
+interface ImportPreview {
+  rows: ImportedSheetRow[]
+  lessonsCount: number
+  error: string | null
+}
+
+const splitImportColumns = (line: string) => {
+  if (line.includes('\t')) {
+    return line.split('\t')
+  }
+
+  if (line.includes(';')) {
+    return line.split(';')
+  }
+
+  if (line.includes(',')) {
+    return line.split(',')
+  }
+
+  return line.split(/\s{2,}/)
+}
+
+const normalizeHeaderValue = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+
+const isImportHeaderRow = (columns: string[]) => {
+  const normalized = columns.slice(0, 4).map(normalizeHeaderValue)
+  const [lessonValue, positionValue, englishValue, russianValue] = normalized
+
+  return (
+    (lessonValue === 'урок' || lessonValue === 'lesson') &&
+    (positionValue === '№' || positionValue === 'no' || positionValue === 'n' || positionValue === 'номер') &&
+    (englishValue === 'en' || englishValue === 'english') &&
+    (russianValue === 'ru' || russianValue === 'russian' || russianValue === 'translation')
+  )
+}
+
+const parseImportSheetData = (rawValue: string): ImportedSheetRow[] => {
+  const lines = rawValue
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) {
+    return []
+  }
+
+  const rows: ImportedSheetRow[] = []
+  const seenPositions = new Set<string>()
+
+  lines.forEach((line, index) => {
+    const columns = splitImportColumns(line).map((column) => column.trim())
+
+    if (columns.length < 4) {
+      throw new Error(`Строка ${index + 1}: нужно 4 столбца - Урок, №, En, Ru.`)
+    }
+
+    if (index === 0 && isImportHeaderRow(columns)) {
+      return
+    }
+
+    const lesson = Number(columns[0])
+    const position = Number(columns[1])
+    const word = columns[2]
+    const translation = columns[3]
+
+    if (!Number.isInteger(lesson) || lesson <= 0) {
+      throw new Error(`Строка ${index + 1}: поле "Урок" должно быть целым числом больше 0.`)
+    }
+
+    if (!Number.isInteger(position) || position <= 0) {
+      throw new Error(`Строка ${index + 1}: поле "№" должно быть целым числом больше 0.`)
+    }
+
+    if (!word || !translation) {
+      throw new Error(`Строка ${index + 1}: нужны и английское слово, и перевод.`)
+    }
+
+    const uniqueKey = `${lesson}:${position}`
+    if (seenPositions.has(uniqueKey)) {
+      throw new Error(`Урок ${lesson}: номер ${position} повторяется. Для каждого урока "№" должен быть уникальным.`)
+    }
+
+    seenPositions.add(uniqueKey)
+    rows.push({
+      lesson,
+      position,
+      word,
+      translation,
+    })
+  })
+
+  return rows.sort((left, right) => {
+    if (left.lesson !== right.lesson) {
+      return left.lesson - right.lesson
+    }
+
+    return left.position - right.position
+  })
+}
+
+const buildImportPreview = (rawValue: string): ImportPreview => {
+  if (!rawValue.trim()) {
+    return {
+      rows: [],
+      lessonsCount: 0,
+      error: null,
+    }
+  }
+
+  try {
+    const rows = parseImportSheetData(rawValue)
+    return {
+      rows,
+      lessonsCount: new Set(rows.map((row) => row.lesson)).size,
+      error: null,
+    }
+  } catch (error) {
+    return {
+      rows: [],
+      lessonsCount: 0,
+      error: error instanceof Error ? error.message : 'Не удалось разобрать таблицу.',
+    }
+  }
+}
 
 export default function AdminCourses() {
+  const navigate = useNavigate()
   const { user, isAuthenticated } = useAuthStore()
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +160,13 @@ export default function AdminCourses() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [slugTouched, setSlugTouched] = useState(false)
+  const [importSheetData, setImportSheetData] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [importStatus, setImportStatus] = useState('')
+
+  const importPreview: ImportPreview = !editingCourse
+    ? buildImportPreview(importSheetData)
+    : { rows: [], lessonsCount: 0, error: null }
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'admin') {
@@ -48,14 +193,86 @@ export default function AdminCourses() {
     setImageMode('url')
     setSlugTouched(false)
     setEditingCourse(null)
+    setImportSheetData('')
+    setSubmitError(null)
+    setImportStatus('')
     setShowForm(false)
+  }
+
+  const importCourseRows = async (course: Course, rows: ImportedSheetRow[]) => {
+    const lessonMap = new Map<number, ImportedSheetRow[]>()
+
+    rows.forEach((row) => {
+      const currentLessonRows = lessonMap.get(row.lesson) || []
+      currentLessonRows.push(row)
+      lessonMap.set(row.lesson, currentLessonRows)
+    })
+
+    const lessonNumbers = Array.from(lessonMap.keys()).sort((left, right) => left - right)
+
+    for (let lessonIndex = 0; lessonIndex < lessonNumbers.length; lessonIndex += 1) {
+      const lessonNumber = lessonNumbers[lessonIndex]
+      const lessonRows = (lessonMap.get(lessonNumber) || []).sort((left, right) => left.position - right.position)
+
+      setImportStatus(`Импорт урока ${lessonNumber} (${lessonIndex + 1}/${lessonNumbers.length})`)
+
+      const deck = await adminService.createDeck({
+        course_id: course.id,
+        title: `Урок ${lessonNumber}`,
+        slug: slugify(`lesson-${lessonNumber}`),
+        description: `Импортировано из таблицы`,
+        position: lessonNumber,
+      })
+
+      for (let rowIndex = 0; rowIndex < lessonRows.length; rowIndex += 1) {
+        const row = lessonRows[rowIndex]
+        let phonetic: string | undefined
+        let audioUrl: string | undefined
+
+        setImportStatus(
+          `Импорт урока ${lessonNumber}: слово ${rowIndex + 1}/${lessonRows.length} (${row.word})`,
+        )
+
+        try {
+          const wordInfo = await dictionaryService.getWordInfo(row.word.toLowerCase())
+          phonetic = wordInfo.phonetic || undefined
+          audioUrl = wordInfo.audio_url || undefined
+        } catch (error) {
+          console.warn(`Audio lookup failed for "${row.word}"`, error)
+        }
+
+        await adminService.createCard({
+          deck_id: deck.id,
+          position: row.position,
+          word: row.word,
+          translation: row.translation,
+          phonetic,
+          audio_url: audioUrl,
+        })
+      }
+    }
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
+    let parsedImportRows: ImportedSheetRow[] = []
+    if (!editingCourse && importSheetData.trim()) {
+      if (importPreview.error) {
+        setSubmitError(importPreview.error)
+        return
+      }
+
+      parsedImportRows = importPreview.rows
+    }
+
+    let createdCourse: Course | null = null
+
     try {
       setUploading(true)
+      setSubmitError(null)
+      setImportStatus('')
+
       let imageUrl = formData.image_url
 
       if (imageMode === 'file' && selectedFile) {
@@ -71,21 +288,41 @@ export default function AdminCourses() {
           image_url: imageUrl || undefined,
         })
       } else {
-        await adminService.createCourse({
+        createdCourse = await adminService.createCourse({
           title: formData.title,
           slug: formData.slug || undefined,
           description: formData.description || undefined,
           image_url: imageUrl || undefined,
           is_published: false,
         })
+
+        if (createdCourse && parsedImportRows.length > 0) {
+          await importCourseRows(createdCourse, parsedImportRows)
+        }
       }
 
       await loadCourses()
+      setImportStatus('')
+
+      if (createdCourse && parsedImportRows.length > 0) {
+        resetForm()
+        navigate(`/admin/decks/${createdCourse.id}`)
+        return
+      }
+
       resetForm()
     } catch (error) {
       console.error(`Error ${editingCourse ? 'updating' : 'creating'} course:`, error)
+
+      if (createdCourse && parsedImportRows.length > 0) {
+        setSubmitError('Курс создан, но импорт прервался. Откройте деки курса и проверьте уже загруженные карточки.')
+        await loadCourses()
+      } else {
+        setSubmitError('Не удалось сохранить курс. Проверьте данные и попробуйте снова.')
+      }
     } finally {
       setUploading(false)
+      setImportStatus('')
     }
   }
 
@@ -98,6 +335,9 @@ export default function AdminCourses() {
       image_url: course.image_url || '',
     })
     setSlugTouched(true)
+    setImportSheetData('')
+    setSubmitError(null)
+    setImportStatus('')
     setShowForm(true)
   }
 
@@ -156,8 +396,7 @@ export default function AdminCourses() {
             <div>
               <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Управление курсами</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Создавайте новые курсы, редактируйте оформление и быстро переходите к декам. Страница теперь собрана в том же
-                визуальном ритме, что и пользовательские разделы.
+                Создавайте новые курсы, редактируйте оформление и сразу импортируйте слова из Google Sheets в готовые уроки.
               </p>
             </div>
           </div>
@@ -174,6 +413,9 @@ export default function AdminCourses() {
                   setSelectedFile(null)
                   setImageMode('url')
                   setSlugTouched(false)
+                  setImportSheetData('')
+                  setSubmitError(null)
+                  setImportStatus('')
                 }
               }}
               className="rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark"
@@ -275,13 +517,67 @@ export default function AdminCourses() {
               </div>
             </div>
 
+            {!editingCourse && (
+              <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/60 p-5">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-semibold text-text-light">Импорт слов из Google Sheets</p>
+                  <p className="text-sm leading-6 text-slate-600">
+                    Вставьте диапазон из таблицы со столбцами <span className="font-semibold">Урок</span>, <span className="font-semibold">№</span>, <span className="font-semibold">En</span>, <span className="font-semibold">Ru</span>.
+                    На каждый номер урока создастся свой подкурс, карточки будут отсортированы по полю "№", а озвучка подтянется автоматически так же, как при ручном создании карточки.
+                  </p>
+                </div>
+
+                <textarea
+                  placeholder={'Урок\t№\tEn\tRu\n1\t1\tHello\tПривет\n1\t2\tHi\tПривет'}
+                  value={importSheetData}
+                  onChange={(event) => {
+                    setImportSheetData(event.target.value)
+                    setSubmitError(null)
+                  }}
+                  className="mt-4 min-h-[220px] w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                />
+
+                <div className="mt-4 space-y-2 text-sm">
+                  {importPreview.error ? (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                      {importPreview.error}
+                    </div>
+                  ) : importPreview.rows.length > 0 ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-emerald-800">
+                      Распознано карточек: {importPreview.rows.length}. Уроков: {importPreview.lessonsCount}. Карточки будут созданы в порядке возрастания урока и номера.
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-emerald-200 bg-white px-4 py-3 text-slate-500">
+                      Импорт необязателен. Если оставить поле пустым, создастся только сам курс.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {submitError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            )}
+
+            {importStatus && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {importStatus}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
               <button
                 type="submit"
-                disabled={uploading}
+                disabled={uploading || Boolean(importPreview.error)}
                 className="rounded-2xl bg-accent-light px-5 py-3 font-semibold text-white transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {uploading ? 'Сохраняю...' : editingCourse ? 'Сохранить курс' : 'Создать курс'}
+                {uploading
+                  ? parsedButtonLabel(Boolean(editingCourse), importPreview.rows.length > 0)
+                  : editingCourse
+                    ? 'Сохранить курс'
+                    : 'Создать курс'}
               </button>
               <button
                 type="button"
@@ -368,4 +664,16 @@ export default function AdminCourses() {
       )}
     </div>
   )
+}
+
+function parsedButtonLabel(isEditing: boolean, hasImportRows: boolean) {
+  if (isEditing) {
+    return 'Сохраняю...'
+  }
+
+  if (hasImportRows) {
+    return 'Создаю курс и импортирую...'
+  }
+
+  return 'Создаю курс...'
 }

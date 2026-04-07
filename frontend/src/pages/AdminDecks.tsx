@@ -82,10 +82,26 @@ export default function AdminDecks() {
     try {
       setLoading(true)
       const data = await adminService.getDecksByCourse(Number(courseId))
-      setDecks(data || [])
+      const nextDecks = data || []
+      setDecks(nextDecks)
+
+      if (nextDecks.length === 0) {
+        setSelectedDeck(null)
+        setCards([])
+        return
+      }
+
+      const nextSelectedDeck = selectedDeck
+        ? nextDecks.find((deck) => deck.id === selectedDeck.id) || nextDecks[0]
+        : nextDecks[0]
+
+      setSelectedDeck(nextSelectedDeck)
+      await loadCards(nextSelectedDeck.id)
     } catch (error) {
       console.error('Error loading decks:', error)
       setDecks([])
+      setSelectedDeck(null)
+      setCards([])
     } finally {
       setLoading(false)
     }
@@ -660,7 +676,10 @@ export default function AdminDecks() {
                           )}
 
                           <div>
-                            <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                                № {card.position}
+                              </span>
                               <div className="text-lg font-bold text-text-light">{card.word}</div>
                               {card.audio_url && (
                                 <button

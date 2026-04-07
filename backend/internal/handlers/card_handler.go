@@ -22,6 +22,7 @@ func NewCardHandler(cardService *services.CardService, userDeckService *services
 // CreateCardRequest запрос на создание card
 type CreateCardRequest struct {
 	DeckID      int64   `json:"deck_id" binding:"required"`
+	Position    *int    `json:"position,omitempty"`
 	Word        string  `json:"word" binding:"required"`
 	Translation string  `json:"translation" binding:"required"`
 	Phonetic    *string `json:"phonetic,omitempty"`
@@ -34,6 +35,7 @@ type CreateCardRequest struct {
 
 // UpdateCardRequest запрос на обновление card
 type UpdateCardRequest struct {
+	Position    *int    `json:"position,omitempty"`
 	Word        string  `json:"word" binding:"required"`
 	Translation string  `json:"translation" binding:"required"`
 	Phonetic    *string `json:"phonetic,omitempty"`
@@ -172,7 +174,7 @@ func (h *CardHandler) CreateCard(c *gin.Context) {
 		c.Header("X-Debug-ImageURL-Normalized", *imageURL)
 	}
 
-	card, err := h.cardService.CreateCard(req.DeckID, req.Word, req.Translation, phonetic, audioURL, imageURL, example, createdBy, req.IsCustom)
+	card, err := h.cardService.CreateCard(req.DeckID, req.Position, req.Word, req.Translation, phonetic, audioURL, imageURL, example, createdBy, req.IsCustom)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -284,7 +286,7 @@ func (h *CardHandler) UpdateCard(c *gin.Context) {
 	imageURL := normalizeString(req.ImageURL)
 	example := normalizeString(req.Example)
 
-	card, err := h.cardService.UpdateCard(cardID, req.Word, req.Translation, phonetic, audioURL, imageURL, example)
+	card, err := h.cardService.UpdateCard(cardID, req.Position, req.Word, req.Translation, phonetic, audioURL, imageURL, example)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

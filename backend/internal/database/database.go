@@ -37,6 +37,11 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 
 	log.Printf("DB connection established")
 
+	if err := ensureCardCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update cards schema: %w", err)
+	}
+
 	if err := ensureTrainingSessionCompatibility(pool); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to update training schema: %w", err)
@@ -48,6 +53,42 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+func ensureCardCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking cards schema...")
+
+	compatSQL := `
+ALTER TABLE cards
+    ADD COLUMN IF NOT EXISTS position INT;
+
+WITH numbered AS (
+    SELECT
+        id,
+        ROW_NUMBER() OVER (PARTITION BY deck_id ORDER BY created_at ASC, id ASC) AS row_number
+    FROM cards
+)
+UPDATE cards c
+SET position = numbered.row_number
+FROM numbered
+WHERE c.id = numbered.id
+  AND (c.position IS NULL OR c.position <= 0);
+
+ALTER TABLE cards
+    ALTER COLUMN position SET DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_cards_deck_position ON cards(deck_id, position);
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("cards schema is up to date")
+	return nil
 }
 
 func ensureTrainingSessionCompatibility(pool *pgxpool.Pool) error {
