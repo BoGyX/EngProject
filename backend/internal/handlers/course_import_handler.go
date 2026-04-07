@@ -8,7 +8,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"path"
 	"path/filepath"
 	"sort"
@@ -399,16 +398,16 @@ func sortImportedCourseRows(rows []importedCourseRow) {
 	})
 }
 
-func buildImportedCardAudioURL(word string) *string {
-	normalizedWord := strings.TrimSpace(word)
-	if normalizedWord == "" {
+func (h *CourseHandler) buildImportedCardAudioURL(word string) *string {
+	normalizedWord := strings.TrimSpace(strings.ToLower(word))
+	if normalizedWord == "" || h.dictionaryService == nil {
 		return nil
 	}
 
-	audioURL := fmt.Sprintf(
-		"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=%s",
-		url.QueryEscape(normalizedWord),
-	)
+	audioURL, err := h.dictionaryService.GetWordAudioURL(normalizedWord)
+	if err != nil || strings.TrimSpace(audioURL) == "" {
+		return nil
+	}
 
 	return &audioURL
 }
@@ -544,7 +543,7 @@ func (h *CourseHandler) CreateCourseFromImport(c *gin.Context) {
 				row.Word,
 				row.Translation,
 				nil,
-				buildImportedCardAudioURL(row.Word),
+				h.buildImportedCardAudioURL(row.Word),
 				nil,
 				nil,
 				createdBy,

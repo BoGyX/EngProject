@@ -11,16 +11,18 @@ import (
 )
 
 type CourseHandler struct {
-	courseService *services.CourseService
-	deckService   *services.DeckService
-	cardService   *services.CardService
+	courseService     *services.CourseService
+	deckService       *services.DeckService
+	cardService       *services.CardService
+	dictionaryService *services.DictionaryService
 }
 
-func NewCourseHandler(courseService *services.CourseService, deckService *services.DeckService, cardService *services.CardService) *CourseHandler {
+func NewCourseHandler(courseService *services.CourseService, deckService *services.DeckService, cardService *services.CardService, dictionaryService *services.DictionaryService) *CourseHandler {
 	return &CourseHandler{
-		courseService: courseService,
-		deckService:   deckService,
-		cardService:   cardService,
+		courseService:     courseService,
+		deckService:       deckService,
+		cardService:       cardService,
+		dictionaryService: dictionaryService,
 	}
 }
 

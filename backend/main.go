@@ -217,7 +217,7 @@ func main() {
 		cfg.Moodle.OnlyAuth,
 		cfg.Moodle.AutoCreate,
 	)
-	courseHandler := handlers.NewCourseHandler(courseService, deckService, cardService)
+	courseHandler := handlers.NewCourseHandler(courseService, deckService, cardService, dictionaryService)
 	deckHandler := handlers.NewDeckHandler(deckService)
 	cardHandler := handlers.NewCardHandler(cardService, userDeckService)
 	vocabHandler := handlers.NewPersonalVocabularyHandler(vocabService)
