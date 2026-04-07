@@ -1,6 +1,25 @@
 import axios from 'axios'
 import { config } from '../config'
 
+const OPTIONAL_AUTH_ENDPOINTS = [
+  /\/user-courses\/active$/,
+  /\/user-decks\/active$/,
+  /\/user-courses\/\d+\/activate$/,
+  /\/user-decks\/\d+\/activate$/,
+]
+
+function shouldRedirectOnUnauthorized(error: any): boolean {
+  const requestUrl = String(error?.config?.url || '')
+  const authHeader = error?.config?.headers?.Authorization || error?.config?.headers?.authorization
+  const hadAuthHeader = Boolean(authHeader)
+
+  if (!hadAuthHeader) {
+    return false
+  }
+
+  return !OPTIONAL_AUTH_ENDPOINTS.some((pattern) => pattern.test(requestUrl))
+}
+
 console.log('🔧 API_URL configured:', config.apiUrl)
 
 export const api = axios.create({
@@ -60,9 +79,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && shouldRedirectOnUnauthorized(error)) {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      localStorage.removeItem('auth-storage')
       window.location.href = '/login'
     }
     return Promise.reject(error)

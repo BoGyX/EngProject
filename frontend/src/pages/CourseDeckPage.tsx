@@ -297,18 +297,18 @@ export default function CourseDeckPage() {
 
     if (canUseProtectedStudyActions) {
       try {
-      const nextActiveDeck = await studyService.activateDeck(deck.id)
-      setActiveDeck(nextActiveDeck)
-      if (loadedCourse?.id) {
-        try {
-          setActiveCourse(await studyService.getActiveCourse())
-        } catch {
-          setActiveCourse(null)
+        const nextActiveDeck = await studyService.activateDeck(deck.id)
+        setActiveDeck(nextActiveDeck)
+        if (loadedCourse?.id) {
+          try {
+            setActiveCourse(await studyService.getActiveCourse())
+          } catch {
+            setActiveCourse(null)
+          }
         }
-      }
-      await refreshScopedUserDecks(scopedDecks)
+        await refreshScopedUserDecks(scopedDecks)
       } catch (error: any) {
-      console.error('Error activating deck:', error)
+        console.error('Error activating deck:', error)
       setSelectionMessage(error?.response?.data?.error || 'Не удалось открыть дек.')
       return
     }
