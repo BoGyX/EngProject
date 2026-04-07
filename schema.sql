@@ -120,6 +120,7 @@ CREATE TABLE personal_vocabulary (
 CREATE TABLE reading_texts (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id BIGINT REFERENCES courses(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     audio_url TEXT DEFAULT '',
@@ -278,6 +279,7 @@ CREATE INDEX idx_personal_vocabulary_word ON personal_vocabulary(word);
 CREATE INDEX idx_personal_vocabulary_tags ON personal_vocabulary USING GIN(tags);
 
 CREATE INDEX idx_reading_texts_user_id ON reading_texts(user_id);
+CREATE INDEX idx_reading_texts_course_id ON reading_texts(course_id);
 CREATE INDEX idx_user_courses_user ON user_courses(user_id);
 CREATE INDEX idx_user_courses_user_course ON user_courses(user_id, course_id);
 CREATE INDEX idx_user_courses_attempt ON user_courses(user_id, course_id, attempt_number);

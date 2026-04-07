@@ -19,6 +19,7 @@ func NewReadingTextHandler(textService *services.ReadingTextService) *ReadingTex
 
 type CreateReadingTextRequest struct {
 	UserID   string `json:"user_id" binding:"required"`
+	CourseID int64  `json:"course_id" binding:"required"`
 	Title    string `json:"title" binding:"required"`
 	Content  string `json:"content" binding:"required"`
 	AudioURL string `json:"audio_url"`
@@ -96,7 +97,12 @@ func (h *ReadingTextHandler) CreateReadingText(c *gin.Context) {
 		return
 	}
 
-	text, err := h.textService.Create(userID, req.Title, req.Content, req.AudioURL)
+	if req.CourseID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "course_id is required"})
+		return
+	}
+
+	text, err := h.textService.Create(userID, req.CourseID, req.Title, req.Content, req.AudioURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -162,4 +168,26 @@ func (h *ReadingTextHandler) UpdateReadingTextAudio(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, text)
+}
+
+func (h *ReadingTextHandler) GetAdminPodcasts(c *gin.Context) {
+	courseIDParam := c.Query("course_id")
+	var courseID int64
+
+	if courseIDParam != "" {
+		parsedCourseID, err := strconv.ParseInt(courseIDParam, 10, 64)
+		if err != nil || parsedCourseID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course_id format"})
+			return
+		}
+		courseID = parsedCourseID
+	}
+
+	podcasts, err := h.textService.GetPodcasts(courseID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, podcasts)
 }

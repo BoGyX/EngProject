@@ -10,6 +10,12 @@ const adminCards = [
     badge: 'Контент',
   },
   {
+    title: 'Подкасты',
+    description: 'Все mp3 из reader, привязанные к курсам, с фильтром по курсу и прослушиванием прямо в панели.',
+    href: '/admin/podcasts',
+    badge: 'Аудио',
+  },
+  {
     title: 'Пользователи',
     description: 'Просмотр зарегистрированных пользователей и контроль ролей внутри платформы.',
     href: '/admin/users',
@@ -33,15 +39,13 @@ export default function AdminDashboard() {
               <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-link-light shadow-sm">
                 Admin
               </span>
-              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
-                Внутренняя панель
-              </span>
+              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">Внутренняя панель</span>
             </div>
 
             <div>
               <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Админ панель</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Быстрый вход в разделы управления курсами, деками и пользователями. Визуально панель теперь собрана в том же
+                Быстрый вход в разделы управления курсами, подкастами и пользователями. Панель собрана в том же визуальном
                 стиле, что и рабочие страницы продукта.
               </p>
             </div>
@@ -55,7 +59,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-2">
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {adminCards.map((card) => (
           <Link
             key={card.href}
@@ -76,12 +80,18 @@ export default function AdminDashboard() {
 
       <section className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
         <h2 className="text-xl font-semibold text-text-light">Быстрые действия</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Link
             to="/admin/courses"
             className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-text-light transition-colors hover:border-rose-200 hover:bg-rose-50"
           >
             Создать или отредактировать курс
+          </Link>
+          <Link
+            to="/admin/podcasts"
+            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-text-light transition-colors hover:border-rose-200 hover:bg-rose-50"
+          >
+            Открыть подкасты
           </Link>
           <a
             href={`${config.baseUrl}/swagger/index.html`}

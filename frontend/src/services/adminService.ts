@@ -57,11 +57,25 @@ export interface CreateCardRequest {
   is_custom?: boolean
 }
 
+export interface Podcast {
+  id: number
+  user_id: string
+  user_name: string
+  user_email: string
+  course_id: number
+  course_title: string
+  course_slug: string
+  title: string
+  audio_url: string
+  created_at: string
+  updated_at: string
+}
+
 export const adminService = {
   // Courses
   async getAllCourses(): Promise<Course[]> {
     const response = await api.get<Course[]>('/admin/courses')
-    return response.data
+    return response.data || []
   },
 
   async getCourse(id: number): Promise<Course> {
@@ -136,5 +150,12 @@ export const adminService = {
 
   async deleteCard(id: number): Promise<void> {
     await api.delete(`/admin/cards/${id}`)
+  },
+
+  // Podcasts
+  async getPodcasts(courseId?: number): Promise<Podcast[]> {
+    const query = courseId ? `?course_id=${courseId}` : ''
+    const response = await api.get<Podcast[]>(`/admin/podcasts${query}`)
+    return response.data || []
   },
 }

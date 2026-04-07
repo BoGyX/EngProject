@@ -168,6 +168,7 @@ func ensureReadingTextCompatibility(pool *pgxpool.Pool) error {
 CREATE TABLE IF NOT EXISTS reading_texts (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id BIGINT REFERENCES courses(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     audio_url TEXT DEFAULT '',
@@ -178,6 +179,22 @@ CREATE TABLE IF NOT EXISTS reading_texts (
 ALTER TABLE reading_texts
     ADD COLUMN IF NOT EXISTS audio_url TEXT;
 
+ALTER TABLE reading_texts
+    ADD COLUMN IF NOT EXISTS course_id BIGINT;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'reading_texts_course_id_fkey'
+    ) THEN
+        ALTER TABLE reading_texts
+            ADD CONSTRAINT reading_texts_course_id_fkey
+            FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 UPDATE reading_texts
 SET audio_url = ''
 WHERE audio_url IS NULL;
@@ -186,6 +203,7 @@ ALTER TABLE reading_texts
     ALTER COLUMN audio_url SET DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_reading_texts_user_id ON reading_texts(user_id);
+CREATE INDEX IF NOT EXISTS idx_reading_texts_course_id ON reading_texts(course_id);
 `
 
 	if _, err := pool.Exec(ctx, compatSQL); err != nil {

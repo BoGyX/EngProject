@@ -422,6 +422,9 @@ func main() {
 			admin.POST("/cards", cardHandler.CreateCard)
 			admin.PUT("/cards/:id", cardHandler.UpdateCard)
 			admin.DELETE("/cards/:id", cardHandler.DeleteCard)
+
+			// Admin Podcasts
+			admin.GET("/podcasts", readingTextHandler.GetAdminPodcasts)
 		}
 	}
 

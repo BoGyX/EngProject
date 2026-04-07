@@ -1,18 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useAuthStore } from './store/authStore'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import Login from './pages/Login'
-import Register from './pages/Register'
+import { useAuthStore } from './store/authStore'
+import AdminCourses from './pages/AdminCourses'
+import AdminDashboard from './pages/AdminDashboard'
+import AdminDecks from './pages/AdminDecks'
+import AdminPodcasts from './pages/AdminPodcasts'
+import AdminUsers from './pages/AdminUsers'
+import CourseDeckPage from './pages/CourseDeckPage'
 import Courses from './pages/Courses'
-import VocabularyDeckPage from './pages/VocabularyDeckPage'
+import Login from './pages/Login'
 import Progress from './pages/Progress'
 import Reader from './pages/Reader'
 import ReaderTextPage from './pages/ReaderTextPage'
-import CourseDeckPage from './pages/CourseDeckPage'
-import AdminDashboard from './pages/AdminDashboard'
-import AdminCourses from './pages/AdminCourses'
-import AdminDecks from './pages/AdminDecks'
-import AdminUsers from './pages/AdminUsers'
+import Register from './pages/Register'
+import VocabularyDeckPage from './pages/VocabularyDeckPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
@@ -21,12 +22,15 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore()
+
   if (!isAuthenticated) {
     return <Navigate to="/login" />
   }
+
   if (user?.role !== 'admin') {
     return <Navigate to="/" />
   }
+
   return <>{children}</>
 }
 
@@ -82,6 +86,14 @@ function App() {
             element={
               <AdminRoute>
                 <AdminUsers />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="admin/podcasts"
+            element={
+              <AdminRoute>
+                <AdminPodcasts />
               </AdminRoute>
             }
           />

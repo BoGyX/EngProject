@@ -7,6 +7,9 @@ import { Course, Deck, studyService } from '../services/studyService'
 interface ReadingText {
   id: number
   user_id: string
+  course_id: number
+  course_title: string
+  course_slug: string
   title: string
   content: string
   audio_url: string
@@ -28,6 +31,8 @@ export default function Reader() {
   const [uploading, setUploading] = useState(false)
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null)
+  const [availableCourses, setAvailableCourses] = useState<Course[]>([])
+  const [selectedCourseId, setSelectedCourseId] = useState('')
 
   const getUserId = () => {
     const authStorage = localStorage.getItem('auth-storage')
@@ -37,8 +42,18 @@ export default function Reader() {
   }
 
   useEffect(() => {
-    void Promise.all([loadTexts(), loadActiveTarget()])
+    void Promise.all([loadTexts(), loadActiveTarget(), loadCourses()])
   }, [])
+
+  const loadCourses = async () => {
+    try {
+      const courses = await studyService.getCourses()
+      setAvailableCourses(courses || [])
+    } catch (error) {
+      console.error('Error loading reader courses:', error)
+      setAvailableCourses([])
+    }
+  }
 
   const loadActiveTarget = async () => {
     try {
@@ -102,13 +117,30 @@ export default function Reader() {
     setTitle('')
     setContent('')
     setAudioFile(null)
+    setSelectedCourseId('')
     setAudioInputKey((current) => current + 1)
     setShowUploadForm(false)
+  }
+
+  const handleToggleUploadForm = () => {
+    if (showUploadForm) {
+      resetForm()
+      return
+    }
+
+    setSelectedCourseId(activeCourse ? String(activeCourse.id) : '')
+    setShowUploadForm(true)
   }
 
   const handleSaveText = async () => {
     if (!title.trim() || !content.trim()) {
       alert('Заполните название и текст')
+      return
+    }
+
+    const courseId = Number(selectedCourseId)
+    if (!courseId) {
+      alert('Выберите курс для этого reader-текста')
       return
     }
 
@@ -129,6 +161,7 @@ export default function Reader() {
 
       await api.post('/reading-texts', {
         user_id: userId,
+        course_id: courseId,
         title: title.trim(),
         content: content.trim(),
         audio_url: uploadedAudio?.url || '',
@@ -223,7 +256,7 @@ export default function Reader() {
           </div>
 
           <button
-            onClick={() => setShowUploadForm(!showUploadForm)}
+            onClick={handleToggleUploadForm}
             className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
           >
             {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
@@ -239,6 +272,24 @@ export default function Reader() {
           </p>
 
           <div className="mt-5 grid gap-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Курс, к которому относится текст</label>
+              <select
+                value={selectedCourseId}
+                onChange={(event) => setSelectedCourseId(event.target.value)}
+                className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:border-link-light focus:outline-none"
+              >
+                <option value="">Выберите курс</option>
+                {availableCourses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.title}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-sm text-slate-500">
+                Выбранный курс нужен, чтобы текст и mp3 появлялись в админке в разделе "Подкасты".
+              </p>
+            </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">Загрузить из файла (.txt)</label>
               <input
@@ -312,6 +363,11 @@ export default function Reader() {
               <div className="p-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Текст reader</p>
+                  {text.course_title && (
+                    <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">
+                      {text.course_title}
+                    </span>
+                  )}
                   {text.audio_url && (
                     <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                       MP3

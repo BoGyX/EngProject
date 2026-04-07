@@ -8,6 +8,9 @@ import { Course, Deck, studyService } from '../services/studyService'
 interface ReadingText {
   id: number
   user_id: string
+  course_id: number
+  course_title: string
+  course_slug: string
   title: string
   content: string
   audio_url: string
@@ -523,6 +526,7 @@ export default function ReaderTextPage() {
   }
 
   const alreadyAdded = wordTranslation ? addedWords.has(wordTranslation.word) : false
+  const linkedCourseTitle = text.course_title?.trim()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 to-orange-100">
@@ -538,6 +542,11 @@ export default function ReaderTextPage() {
             </button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
+                {linkedCourseTitle && (
+                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
+                    Курс текста: {linkedCourseTitle}
+                  </span>
+                )}
                 {activeCourse && (
                   <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
                     Курс: {activeCourse.title}
@@ -609,6 +618,12 @@ export default function ReaderTextPage() {
           <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-text-light">Куда добавится слово</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
+              {linkedCourseTitle && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-rose-500">Курс текста</p>
+                  <p className="mt-2 font-semibold text-text-light">{linkedCourseTitle}</p>
+                </div>
+              )}
               {activeDeck ? (
                 <>
                   <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3">
