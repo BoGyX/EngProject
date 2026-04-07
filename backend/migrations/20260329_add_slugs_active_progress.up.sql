@@ -108,7 +108,6 @@ CREATE TABLE IF NOT EXISTS training_session_cards (
     session_id BIGINT NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
     card_id BIGINT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
     position INT NOT NULL,
-    UNIQUE(session_id, card_id),
     UNIQUE(session_id, position)
 );
 
@@ -119,6 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_user_courses_active ON user_courses(user_id, is_a
 CREATE INDEX IF NOT EXISTS idx_user_decks_active ON user_decks(user_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_user_cards_progress ON user_cards(user_id, progress_percentage);
 CREATE INDEX IF NOT EXISTS idx_training_session_cards_session ON training_session_cards(session_id);
+CREATE INDEX IF NOT EXISTS idx_training_session_cards_session_card ON training_session_cards(session_id, card_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cards_custom_user_deck_word
 ON cards (deck_id, created_by, LOWER(word))
 WHERE is_custom = true AND created_by IS NOT NULL;

@@ -117,6 +117,9 @@ ALTER TABLE training_session_cards
     ALTER COLUMN created_at SET DEFAULT NOW(),
     ALTER COLUMN updated_at SET DEFAULT NOW();
 
+ALTER TABLE training_session_cards
+    DROP CONSTRAINT IF EXISTS training_session_cards_session_id_card_id_key;
+
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -142,6 +145,9 @@ BEGIN
             CHECK (current_mode IN ('view', 'choice', 'with_photo', 'russian', 'constructor', 'completed'));
     END IF;
 END $$;
+
+CREATE INDEX IF NOT EXISTS idx_training_session_cards_session_card
+    ON training_session_cards(session_id, card_id);
 `
 
 	if _, err := pool.Exec(ctx, compatSQL); err != nil {

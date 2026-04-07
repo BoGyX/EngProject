@@ -213,9 +213,9 @@ export const studyService = {
     return response.data
   },
 
-  async answerTraining(sessionId: number, cardId: number, answer = ''): Promise<TrainingAnswerResponse> {
+  async answerTraining(sessionId: number, sessionCardId: number, answer = ''): Promise<TrainingAnswerResponse> {
     const response = await api.post<TrainingAnswerResponse>(`/training-sessions/${sessionId}/answer`, {
-      card_id: cardId,
+      session_card_id: sessionCardId,
       answer,
     })
     return response.data

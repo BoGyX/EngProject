@@ -230,7 +230,6 @@ CREATE TABLE training_session_cards (
     wrong_answers INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    UNIQUE(session_id, card_id),
     UNIQUE(session_id, position),
     UNIQUE(session_id, sequence_number)
 );
@@ -301,6 +300,7 @@ CREATE INDEX idx_user_cards_progress ON user_cards(user_id, progress_percentage)
 CREATE INDEX idx_training_sessions_user ON training_sessions(user_id);
 CREATE INDEX idx_training_sessions_deck ON training_sessions(deck_id);
 CREATE INDEX idx_training_session_cards_session ON training_session_cards(session_id);
+CREATE INDEX idx_training_session_cards_session_card ON training_session_cards(session_id, card_id);
 
 -- ===================================
 -- TRIGGERS для updated_at

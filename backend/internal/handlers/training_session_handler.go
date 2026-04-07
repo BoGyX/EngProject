@@ -240,15 +240,31 @@ func (h *TrainingSessionHandler) SubmitAnswer(c *gin.Context) {
 	}
 
 	var req struct {
-		CardID int64  `json:"card_id" binding:"required"`
-		Answer string `json:"answer"`
+		SessionCardID *int64 `json:"session_card_id"`
+		CardID        *int64 `json:"card_id"`
+		Answer        string `json:"answer"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	state, isCorrect, err := h.trainingSessionService.SubmitScopedAnswer(userID, sessionID, req.CardID, req.Answer)
+	var sessionCardID int64
+	switch {
+	case req.SessionCardID != nil:
+		sessionCardID = *req.SessionCardID
+	case req.CardID != nil:
+		sessionCardID, err = h.trainingSessionService.GetNextPendingSessionCardID(sessionID, *req.CardID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "session_card_id is required"})
+		return
+	}
+
+	state, isCorrect, err := h.trainingSessionService.SubmitScopedAnswer(userID, sessionID, sessionCardID, req.Answer)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

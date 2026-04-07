@@ -13,6 +13,19 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type trainingSessionQueueEntry struct {
+	CardID   int64
+	Mode     string
+	Progress int
+}
+
+type trainingSessionCardPlan struct {
+	Card     *models.Card
+	UserCard *models.UserCard
+	Modes    []string
+	Progress int
+}
+
 func (s *TrainingSessionService) GetTrainingSessionStateByID(id int64, userID *uuid.UUID) (*models.TrainingSessionState, error) {
 	session, err := s.getSessionModelByID(id, userID)
 	if err != nil {
@@ -127,11 +140,11 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 		}
 	}
 
-	cardIDs, err := s.getAvailableScopedCardIDs(userID, userDeck)
+	queueEntries, err := s.buildScopedTrainingQueue(userID, userDeck)
 	if err != nil {
 		return nil, err
 	}
-	if len(cardIDs) == 0 {
+	if len(queueEntries) == 0 {
 		return nil, errors.New("no unfinished cards available for training")
 	}
 
@@ -153,25 +166,13 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 		return nil, err
 	}
 
-	for index, cardID := range cardIDs {
-		card, err := s.cardService.GetCardByID(cardID)
-		if err != nil {
-			return nil, err
-		}
-
-		currentMode := deriveCurrentTrainingModeForCard(nil, card)
-		progress := deriveTrainingProgressForCard(nil, card)
-		if userCard, err := s.userCardService.GetUserCardByCardAndDeck(userID, cardID, &userDeck.ID); err == nil {
-			currentMode = deriveCurrentTrainingModeForCard(userCard, card)
-			progress = deriveTrainingProgressForCard(userCard, card)
-		}
-
+	for index, entry := range queueEntries {
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO training_session_cards (
 				session_id, card_id, position, sequence_number, current_mode, progress_percentage, is_completed,
 				correct_answers, wrong_answers, created_at, updated_at
 			) VALUES ($1, $2, $3, $3, $4, $5, $6, 0, 0, NOW(), NOW())`,
-			session.ID, cardID, index+1, currentMode, progress, progress >= 100,
+			session.ID, entry.CardID, index+1, entry.Mode, entry.Progress, false,
 		); err != nil {
 			return nil, err
 		}
@@ -184,7 +185,7 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 	return s.GetTrainingSessionStateByID(session.ID, &userID)
 }
 
-func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID int64, cardID int64, answer string) (*models.TrainingSessionState, bool, error) {
+func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID int64, sessionCardID int64, answer string) (*models.TrainingSessionState, bool, error) {
 	ctx := context.Background()
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -206,21 +207,24 @@ func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID 
 		return nil, false, errors.New("training session is already finished")
 	}
 
-	sessionCard, err := s.getSessionCardForUpdate(ctx, tx, sessionID, cardID)
+	sessionCard, err := s.getSessionCardForUpdate(ctx, tx, sessionID, sessionCardID)
+	if err != nil {
+		return nil, false, err
+	}
+	if sessionCard.IsCompleted {
+		return nil, false, errors.New("training session card is already completed")
+	}
+
+	card, err := s.cardService.GetCardByID(sessionCard.CardID)
 	if err != nil {
 		return nil, false, err
 	}
 
-	card, err := s.cardService.GetCardByID(cardID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	userCard, err := s.userCardService.GetUserCardByCardAndDeck(userID, cardID, session.UserDeckID)
+	userCard, err := s.userCardService.GetUserCardByCardAndDeck(userID, sessionCard.CardID, session.UserDeckID)
 	if err != nil {
 		userCard, err = s.userCardService.CreateUserCardWithModes(
 			userID,
-			cardID,
+			sessionCard.CardID,
 			session.UserDeckID,
 			"new",
 			0,
@@ -239,7 +243,7 @@ func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID 
 		}
 	}
 
-	currentMode := deriveCurrentTrainingModeForCard(userCard, card)
+	currentMode := sessionCard.CurrentMode
 	progress := deriveTrainingProgressForCard(userCard, card)
 	isCorrect := evaluateTrainingAnswer(currentMode, answer, card)
 	lastSeen := time.Now()
@@ -283,7 +287,10 @@ func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID 
 		return nil, false, err
 	}
 
-	if err := s.updateTrainingSessionCard(ctx, tx, sessionCard.ID, nextMode, progress, progress >= 100, &isCorrect, boolToInt(isCorrect), boolToInt(!isCorrect)); err != nil {
+	if err := s.updateTrainingSessionCard(ctx, tx, sessionCard.ID, currentMode, progress, true, &isCorrect, boolToInt(isCorrect), boolToInt(!isCorrect)); err != nil {
+		return nil, false, err
+	}
+	if err := s.refreshRemainingSessionCardsForCard(ctx, tx, sessionID, sessionCard.CardID, progress); err != nil {
 		return nil, false, err
 	}
 	if err := s.refreshScopedDeckAndCourseProgress(ctx, tx, userID, *session.UserDeckID); err != nil {
@@ -348,15 +355,15 @@ func (s *TrainingSessionService) getSessionForUpdate(ctx context.Context, tx pgx
 	return &session, nil
 }
 
-func (s *TrainingSessionService) getSessionCardForUpdate(ctx context.Context, tx pgx.Tx, sessionID int64, cardID int64) (*models.TrainingSessionCard, error) {
+func (s *TrainingSessionService) getSessionCardForUpdate(ctx context.Context, tx pgx.Tx, sessionID int64, sessionCardID int64) (*models.TrainingSessionCard, error) {
 	var sessionCard models.TrainingSessionCard
 	err := tx.QueryRow(ctx,
 		`SELECT id, session_id, card_id, sequence_number, current_mode, progress_percentage,
 		        is_completed, last_answer_correct, correct_answers, wrong_answers, created_at, updated_at
 		 FROM training_session_cards
-		 WHERE session_id = $1 AND card_id = $2
+		 WHERE session_id = $1 AND id = $2
 		 FOR UPDATE`,
-		sessionID, cardID,
+		sessionID, sessionCardID,
 	).Scan(
 		&sessionCard.ID,
 		&sessionCard.SessionID,
@@ -376,6 +383,25 @@ func (s *TrainingSessionService) getSessionCardForUpdate(ctx context.Context, tx
 	}
 
 	return &sessionCard, nil
+}
+
+func (s *TrainingSessionService) GetNextPendingSessionCardID(sessionID int64, cardID int64) (int64, error) {
+	var sessionCardID int64
+	err := s.db.QueryRow(context.Background(),
+		`SELECT id
+		 FROM training_session_cards
+		 WHERE session_id = $1
+		   AND card_id = $2
+		   AND is_completed = false
+		 ORDER BY sequence_number ASC
+		 LIMIT 1`,
+		sessionID, cardID,
+	).Scan(&sessionCardID)
+	if err != nil {
+		return 0, errors.New("training session card not found")
+	}
+
+	return sessionCardID, nil
 }
 
 func (s *TrainingSessionService) getLatestOpenScopedSessionID(userID uuid.UUID, userDeckID int64) (int64, error) {
@@ -436,7 +462,7 @@ func (s *TrainingSessionService) resolveScopedUserDeck(userID uuid.UUID, courseI
 	return userDeck, &resolvedCourseID, nil
 }
 
-func (s *TrainingSessionService) getAvailableScopedCardIDs(userID uuid.UUID, userDeck *models.UserDeck) ([]int64, error) {
+func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, userDeck *models.UserDeck) ([]trainingSessionQueueEntry, error) {
 	rows, err := s.db.Query(context.Background(),
 		`SELECT
 			c.id,
@@ -468,7 +494,7 @@ func (s *TrainingSessionService) getAvailableScopedCardIDs(userID uuid.UUID, use
 	}
 	defer rows.Close()
 
-	var ids []int64
+	var cardPlans []trainingSessionCardPlan
 	for rows.Next() {
 		var (
 			cardID          int64
@@ -535,12 +561,52 @@ func (s *TrainingSessionService) getAvailableScopedCardIDs(userID uuid.UUID, use
 			}
 		}
 
-		if deriveTrainingProgressForCard(userCard, card) < 100 {
-			ids = append(ids, cardID)
+		modes := getUnfinishedTrainingModes(userCard, card)
+		if len(modes) == 0 {
+			continue
+		}
+
+		cardPlans = append(cardPlans, trainingSessionCardPlan{
+			Card:     card,
+			UserCard: userCard,
+			Modes:    modes,
+			Progress: deriveTrainingProgressForCard(userCard, card),
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(cardPlans) == 0 {
+		return []trainingSessionQueueEntry{}, nil
+	}
+
+	shuffleTrainingCardPlans(cardPlans)
+
+	maxRounds := 0
+	for _, plan := range cardPlans {
+		if len(plan.Modes) > maxRounds {
+			maxRounds = len(plan.Modes)
 		}
 	}
 
-	return ids, rows.Err()
+	queue := make([]trainingSessionQueueEntry, 0)
+	for round := 0; round < maxRounds; round++ {
+		for _, plan := range cardPlans {
+			if round >= len(plan.Modes) {
+				continue
+			}
+
+			queue = append(queue, trainingSessionQueueEntry{
+				CardID:   plan.Card.ID,
+				Mode:     plan.Modes[round],
+				Progress: plan.Progress,
+			})
+		}
+	}
+
+	return queue, nil
 }
 
 func (s *TrainingSessionService) getFirstDeckIDByCourse(courseID int64) (int64, error) {
@@ -582,6 +648,102 @@ func (s *TrainingSessionService) updateTrainingSessionCard(ctx context.Context, 
 		currentMode, progress, isCompleted, lastAnswerCorrect, correctDelta, wrongDelta, sessionCardID,
 	)
 	return err
+}
+
+func (s *TrainingSessionService) refreshRemainingSessionCardsForCard(ctx context.Context, tx pgx.Tx, sessionID int64, cardID int64, progress int) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE training_session_cards
+		 SET progress_percentage = $1,
+		     updated_at = NOW()
+		 WHERE session_id = $2
+		   AND card_id = $3
+		   AND is_completed = false`,
+		progress, sessionID, cardID,
+	)
+	return err
+}
+
+func (s *TrainingSessionService) moveScopedSessionCardToQueueTail(ctx context.Context, tx pgx.Tx, sessionID int64, sessionCardID int64) error {
+	rows, err := tx.Query(ctx,
+		`SELECT id, is_completed
+		 FROM training_session_cards
+		 WHERE session_id = $1
+		 ORDER BY sequence_number ASC`,
+		sessionID,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var unfinishedIDs []int64
+	var completedIDs []int64
+	var currentCardCompleted bool
+	var currentCardFound bool
+
+	for rows.Next() {
+		var id int64
+		var isCompleted bool
+		if err := rows.Scan(&id, &isCompleted); err != nil {
+			return err
+		}
+
+		if id == sessionCardID {
+			currentCardCompleted = isCompleted
+			currentCardFound = true
+			continue
+		}
+
+		if isCompleted {
+			completedIDs = append(completedIDs, id)
+		} else {
+			unfinishedIDs = append(unfinishedIDs, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+
+	if !currentCardFound {
+		return errors.New("training session card not found")
+	}
+
+	orderedIDs := append([]int64{}, unfinishedIDs...)
+	if currentCardCompleted {
+		orderedIDs = append(orderedIDs, completedIDs...)
+		orderedIDs = append(orderedIDs, sessionCardID)
+	} else {
+		orderedIDs = append(orderedIDs, sessionCardID)
+		orderedIDs = append(orderedIDs, completedIDs...)
+	}
+
+	if len(orderedIDs) == 0 {
+		return nil
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE training_session_cards
+		 SET sequence_number = -sequence_number
+		 WHERE session_id = $1`,
+		sessionID,
+	); err != nil {
+		return err
+	}
+
+	for index, id := range orderedIDs {
+		if _, err := tx.Exec(ctx,
+			`UPDATE training_session_cards
+			 SET sequence_number = $1,
+			     updated_at = NOW()
+			 WHERE id = $2`,
+			index+1, id,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *TrainingSessionService) refreshScopedDeckAndCourseProgress(ctx context.Context, tx pgx.Tx, userID uuid.UUID, userDeckID int64) error {
@@ -932,6 +1094,13 @@ func shuffleInt64Values(values []int64) {
 	})
 }
 
+func shuffleTrainingCardPlans(plans []trainingSessionCardPlan) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(plans), func(i, j int) {
+		plans[i], plans[j] = plans[j], plans[i]
+	})
+}
+
 func shuffleStringValues(values []string) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	r.Shuffle(len(values), func(i, j int) {
@@ -944,4 +1113,17 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+func getUnfinishedTrainingModes(userCard *models.UserCard, card *models.Card) []string {
+	modes := getTrainingModeSequence(card)
+	unfinished := make([]string, 0, len(modes))
+
+	for _, mode := range modes {
+		if !isTrainingModeCompleted(userCard, mode) {
+			unfinished = append(unfinished, mode)
+		}
+	}
+
+	return unfinished
 }

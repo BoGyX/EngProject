@@ -66,8 +66,8 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
       return 0
     }
 
-    const total = session.cards.reduce((sum, card) => sum + card.progress_percentage, 0)
-    return Math.round(total / session.cards.length)
+    const completedSteps = session.cards.filter((card) => card.is_completed).length
+    return Math.round((completedSteps / session.cards.length) * 100)
   }, [session])
 
   const startSession = async () => {
@@ -96,13 +96,13 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
       setSubmitting(true)
       setFeedback(null)
 
-      const response = await studyService.answerTraining(session.session.id, currentCard.card_id, answer)
+      const response = await studyService.answerTraining(session.session.id, currentCard.session_card_id, answer)
       setSession(response.session)
       setFeedback({
         correct: response.is_correct,
         text: response.is_correct
-          ? 'Верно, переходим дальше.'
-          : 'Ошибка. Повторяем этот же режим, пока слово не будет пройдено.',
+          ? 'Верно. Переходим к следующему слову.'
+          : 'Ошибка. Идем к следующему слову; этот режим вернется уже в новой сессии.',
       })
     } catch (error) {
       console.error('Error submitting training answer:', error)
@@ -401,7 +401,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-400">
-                    Карточка {currentCard.sequence_number} из {session.cards.length}
+                    Шаг {currentCard.sequence_number} из {session.cards.length}
                   </p>
                   <p className="text-lg font-semibold text-link-light">
                     {getTrainingModeStepLabel(currentCard, currentCard.current_mode)}
