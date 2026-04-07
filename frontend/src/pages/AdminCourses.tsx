@@ -5,7 +5,6 @@ import { useAuthStore } from '../store/authStore'
 import { uploadService } from '../services/uploadService'
 import { config } from '../config'
 import { slugify } from '../utils/slug'
-import { dictionaryService } from '../services/dictionaryService'
 
 interface ImportedSheetRow {
   lesson: number
@@ -143,6 +142,15 @@ const buildImportPreview = (rawValue: string): ImportPreview => {
   }
 }
 
+const buildImportedAudioUrl = (word: string) => {
+  const normalizedWord = word.trim()
+  if (!normalizedWord) {
+    return undefined
+  }
+
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(normalizedWord)}`
+}
+
 export default function AdminCourses() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuthStore()
@@ -224,31 +232,25 @@ export default function AdminCourses() {
         position: lessonNumber,
       })
 
-      for (let rowIndex = 0; rowIndex < lessonRows.length; rowIndex += 1) {
-        const row = lessonRows[rowIndex]
-        let phonetic: string | undefined
-        let audioUrl: string | undefined
+      const batchSize = 8
+      for (let batchStart = 0; batchStart < lessonRows.length; batchStart += batchSize) {
+        const batchRows = lessonRows.slice(batchStart, batchStart + batchSize)
 
         setImportStatus(
-          `Импорт урока ${lessonNumber}: слово ${rowIndex + 1}/${lessonRows.length} (${row.word})`,
+          `Импорт урока ${lessonNumber}: слова ${batchStart + 1}-${batchStart + batchRows.length} из ${lessonRows.length}`,
         )
 
-        try {
-          const wordInfo = await dictionaryService.getWordInfo(row.word.toLowerCase())
-          phonetic = wordInfo.phonetic || undefined
-          audioUrl = wordInfo.audio_url || undefined
-        } catch (error) {
-          console.warn(`Audio lookup failed for "${row.word}"`, error)
-        }
-
-        await adminService.createCard({
-          deck_id: deck.id,
-          position: row.position,
-          word: row.word,
-          translation: row.translation,
-          phonetic,
-          audio_url: audioUrl,
-        })
+        await Promise.all(
+          batchRows.map((row) =>
+            adminService.createCard({
+              deck_id: deck.id,
+              position: row.position,
+              word: row.word,
+              translation: row.translation,
+              audio_url: buildImportedAudioUrl(row.word),
+            }),
+          ),
+        )
       }
     }
   }
@@ -523,7 +525,7 @@ export default function AdminCourses() {
                   <p className="text-sm font-semibold text-text-light">Импорт слов из Google Sheets</p>
                   <p className="text-sm leading-6 text-slate-600">
                     Вставьте диапазон из таблицы со столбцами <span className="font-semibold">Урок</span>, <span className="font-semibold">№</span>, <span className="font-semibold">En</span>, <span className="font-semibold">Ru</span>.
-                    На каждый номер урока создастся свой подкурс, карточки будут отсортированы по полю "№", а озвучка подтянется автоматически так же, как при ручном создании карточки.
+                    На каждый номер урока создастся свой подкурс, карточки будут отсортированы по полю "№", а озвучка добавится автоматически без отдельной ручной настройки.
                   </p>
                 </div>
 
