@@ -19,7 +19,7 @@ func NewReadingTextService(db *pgxpool.Pool) *ReadingTextService {
 
 func (s *ReadingTextService) GetAllByUserID(userID uuid.UUID) ([]models.ReadingText, error) {
 	rows, err := s.db.Query(context.Background(),
-		`SELECT id, user_id, title, content, created_at, updated_at 
+		`SELECT id, user_id, title, content, audio_url, created_at, updated_at
 		 FROM reading_texts WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID,
 	)
@@ -31,7 +31,7 @@ func (s *ReadingTextService) GetAllByUserID(userID uuid.UUID) ([]models.ReadingT
 	var texts []models.ReadingText
 	for rows.Next() {
 		var text models.ReadingText
-		err := rows.Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.CreatedAt, &text.UpdatedAt)
+		err := rows.Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.AudioURL, &text.CreatedAt, &text.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -44,10 +44,10 @@ func (s *ReadingTextService) GetAllByUserID(userID uuid.UUID) ([]models.ReadingT
 func (s *ReadingTextService) GetByID(textID int64, userID uuid.UUID) (*models.ReadingText, error) {
 	var text models.ReadingText
 	err := s.db.QueryRow(context.Background(),
-		`SELECT id, user_id, title, content, created_at, updated_at 
+		`SELECT id, user_id, title, content, audio_url, created_at, updated_at
 		 FROM reading_texts WHERE id = $1 AND user_id = $2`,
 		textID, userID,
-	).Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.CreatedAt, &text.UpdatedAt)
+	).Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.AudioURL, &text.CreatedAt, &text.UpdatedAt)
 
 	if err != nil {
 		return nil, errors.New("text not found")
@@ -56,14 +56,14 @@ func (s *ReadingTextService) GetByID(textID int64, userID uuid.UUID) (*models.Re
 	return &text, nil
 }
 
-func (s *ReadingTextService) Create(userID uuid.UUID, title, content string) (*models.ReadingText, error) {
+func (s *ReadingTextService) Create(userID uuid.UUID, title, content, audioURL string) (*models.ReadingText, error) {
 	var text models.ReadingText
 	err := s.db.QueryRow(context.Background(),
-		`INSERT INTO reading_texts (user_id, title, content)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, user_id, title, content, created_at, updated_at`,
-		userID, title, content,
-	).Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.CreatedAt, &text.UpdatedAt)
+		`INSERT INTO reading_texts (user_id, title, content, audio_url)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, title, content, audio_url, created_at, updated_at`,
+		userID, title, content, audioURL,
+	).Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.AudioURL, &text.CreatedAt, &text.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -87,4 +87,21 @@ func (s *ReadingTextService) Delete(textID int64, userID uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (s *ReadingTextService) UpdateAudio(textID int64, userID uuid.UUID, audioURL string) (*models.ReadingText, error) {
+	var text models.ReadingText
+	err := s.db.QueryRow(context.Background(),
+		`UPDATE reading_texts
+		 SET audio_url = $3, updated_at = NOW()
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, title, content, audio_url, created_at, updated_at`,
+		textID, userID, audioURL,
+	).Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.AudioURL, &text.CreatedAt, &text.UpdatedAt)
+
+	if err != nil {
+		return nil, errors.New("text not found")
+	}
+
+	return &text, nil
 }

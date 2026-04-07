@@ -179,10 +179,6 @@ export default function CourseDeckPage() {
 
       setCourse(loadedCourse)
 
-      if (id && loadedCourse.slug) {
-        navigate(`/deck/${loadedCourse.slug}`, { replace: true })
-      }
-
       try {
         await studyService.activateCourse(loadedCourse.id)
       } catch (error) {
@@ -291,7 +287,7 @@ export default function CourseDeckPage() {
 
     await loadCards(deck.id)
 
-    if (pushHistory && loadedCourse?.slug && deck.slug) {
+    if (pushHistory && courseSlug && loadedCourse?.slug && deck.slug) {
       navigate(`/deck/${loadedCourse.slug}/${deck.slug}`)
     }
   }

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import { uploadService } from '../services/uploadService'
 import { Course, Deck, studyService } from '../services/studyService'
 
 interface ReadingText {
@@ -8,6 +9,7 @@ interface ReadingText {
   user_id: string
   title: string
   content: string
+  audio_url: string
   created_at: string
   updated_at: string
 }
@@ -21,6 +23,8 @@ export default function Reader() {
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [audioInputKey, setAudioInputKey] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null)
@@ -89,6 +93,19 @@ export default function Reader() {
     reader.readAsText(file)
   }
 
+  const handleAudioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    setAudioFile(file || null)
+  }
+
+  const resetForm = () => {
+    setTitle('')
+    setContent('')
+    setAudioFile(null)
+    setAudioInputKey((current) => current + 1)
+    setShowUploadForm(false)
+  }
+
   const handleSaveText = async () => {
     if (!title.trim() || !content.trim()) {
       alert('Заполните название и текст')
@@ -101,19 +118,31 @@ export default function Reader() {
       return
     }
 
+    let uploadedAudio: { url: string; filename: string } | null = null
+
     try {
       setUploading(true)
+
+      if (audioFile) {
+        uploadedAudio = await uploadService.uploadAudio(audioFile)
+      }
+
       await api.post('/reading-texts', {
         user_id: userId,
         title: title.trim(),
         content: content.trim(),
+        audio_url: uploadedAudio?.url || '',
       })
 
-      setTitle('')
-      setContent('')
-      setShowUploadForm(false)
+      resetForm()
       await loadTexts()
     } catch (error) {
+      if (uploadedAudio?.filename) {
+        void uploadService.deleteFile('audio', uploadedAudio.filename).catch((cleanupError) => {
+          console.error('Error deleting uploaded audio after failed save:', cleanupError)
+        })
+      }
+
       console.error('Error saving text:', error)
       alert('Ошибка при сохранении текста')
     } finally {
@@ -168,22 +197,20 @@ export default function Reader() {
             <div>
               <h1 className="text-3xl font-bold text-text-light">Reader и тексты для курса</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Нажимайте на слова внутри текста: reader покажет перевод, произношение и позволит сразу добавить слово в текущий активный дек.
+                Нажимайте на слова внутри текста: reader покажет перевод, произношение и позволит сразу
+                добавить слово в текущий активный дек.
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 text-sm text-slate-600 shadow-sm">
               {activeDeck ? (
                 <p>
-                  Сейчас новые слова будут добавляться в дек
-                  {' '}
+                  Сейчас новые слова будут добавляться в дек{' '}
                   <span className="font-semibold text-link-light">{activeDeck.title}</span>
                   {activeCourse ? (
                     <>
                       {' '}
-                      курса
-                      {' '}
-                      <span className="font-semibold text-text-light">{activeCourse.title}</span>.
+                      курса <span className="font-semibold text-text-light">{activeCourse.title}</span>.
                     </>
                   ) : (
                     '.'
@@ -208,7 +235,7 @@ export default function Reader() {
         <section className="rounded-[28px] border border-rose-200 bg-white p-6 shadow-lg">
           <h2 className="text-xl font-bold text-text-light">Новый текст</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Заголовок поддерживает переносы через {'<br>'}, а сам текст позже можно будет озвучить в reader.
+            Заголовок поддерживает переносы через {'<br>'}, а для самого текста можно сразу прикрепить свою mp3-озвучку.
           </p>
 
           <div className="mt-5 grid gap-4">
@@ -244,6 +271,20 @@ export default function Reader() {
               />
             </div>
 
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Своя озвучка (.mp3, необязательно)</label>
+              <input
+                key={audioInputKey}
+                type="file"
+                accept=".mp3,audio/*"
+                onChange={handleAudioFileChange}
+                className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:border-link-light focus:outline-none"
+              />
+              <p className="mt-2 text-sm text-slate-500">
+                {audioFile ? `Выбран файл: ${audioFile.name}` : 'Можно прикрепить свой mp3 и потом запускать или ставить его на паузу в reader.'}
+              </p>
+            </div>
+
             <button
               onClick={handleSaveText}
               disabled={uploading}
@@ -269,7 +310,14 @@ export default function Reader() {
               onClick={() => openText(text.id)}
             >
               <div className="p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Текст reader</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Текст reader</p>
+                  {text.audio_url && (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                      MP3
+                    </span>
+                  )}
+                </div>
                 <h3 className="mt-3 whitespace-pre-line text-2xl font-bold leading-tight text-text-light">{normalizeBreaks(text.title)}</h3>
                 <p className="mt-3 text-sm text-slate-500">
                   {new Date(text.created_at).toLocaleDateString('ru-RU', {

@@ -17,14 +17,14 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode,
 	)
 
-	log.Printf("Подключение к БД: %s@%s:%s/%s", cfg.User, cfg.Host, cfg.Port, cfg.Name)
+	log.Printf("Connecting to DB: %s@%s:%s/%s", cfg.User, cfg.Host, cfg.Port, cfg.Name)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось создать пул подключений: %w", err)
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
 	ctxPing, cancelPing := context.WithTimeout(context.Background(), 5*time.Second)
@@ -32,14 +32,19 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 
 	if err := pool.Ping(ctxPing); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("не удалось подключиться к БД: %w. Проверьте параметры подключения в .env", err)
+		return nil, fmt.Errorf("failed to connect to DB: %w. Check your .env connection settings", err)
 	}
 
-	log.Printf("Успешное подключение к БД")
+	log.Printf("DB connection established")
 
 	if err := ensureTrainingSessionCompatibility(pool); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("не удалось привести схему обучения к актуальному виду: %w", err)
+		return nil, fmt.Errorf("failed to update training schema: %w", err)
+	}
+
+	if err := ensureReadingTextCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update reading_texts schema: %w", err)
 	}
 
 	return pool, nil
@@ -49,7 +54,7 @@ func ensureTrainingSessionCompatibility(pool *pgxpool.Pool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	log.Println("Проверка схемы training_session_cards...")
+	log.Println("Checking training_session_cards schema...")
 
 	compatSQL := `
 ALTER TABLE training_session_cards
@@ -143,6 +148,44 @@ END $$;
 		return err
 	}
 
-	log.Println("Схема training_session_cards актуальна")
+	log.Println("training_session_cards schema is up to date")
+	return nil
+}
+
+func ensureReadingTextCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking reading_texts schema...")
+
+	compatSQL := `
+CREATE TABLE IF NOT EXISTS reading_texts (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    audio_url TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE reading_texts
+    ADD COLUMN IF NOT EXISTS audio_url TEXT;
+
+UPDATE reading_texts
+SET audio_url = ''
+WHERE audio_url IS NULL;
+
+ALTER TABLE reading_texts
+    ALTER COLUMN audio_url SET DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_reading_texts_user_id ON reading_texts(user_id);
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("reading_texts schema is up to date")
 	return nil
 }

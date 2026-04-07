@@ -45,7 +45,7 @@ export default function Courses() {
           {courses.map((course) => (
             <Link
               key={course.id}
-              to={course.slug ? `/deck/${course.slug}` : `/courses/${course.id}`}
+              to={`/courses/${course.id}`}
               className="bg-card-light shadow-md rounded-lg overflow-hidden border border-gray-200 hover:shadow-lg hover:border-link-light transition-all"
             >
               {course.image_url && (

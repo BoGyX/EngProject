@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { config } from '../config'
 import api from '../services/api'
 import { dictionaryService } from '../services/dictionaryService'
 import { Course, Deck, studyService } from '../services/studyService'
+import { uploadService } from '../services/uploadService'
 
 interface ReadingText {
   id: number
   user_id: string
   title: string
   content: string
+  audio_url: string
   created_at: string
   updated_at: string
 }
@@ -139,6 +142,15 @@ function pickPreferredVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoic
   return voicePool[0] || null
 }
 
+function getUploadedAudioFilename(audioUrl: string): string | null {
+  if (!audioUrl || !audioUrl.includes('/uploads/audio/')) {
+    return null
+  }
+
+  const segments = audioUrl.split('/')
+  return segments[segments.length - 1] || null
+}
+
 export default function ReaderTextPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -147,16 +159,20 @@ export default function ReaderTextPage() {
   const [wordTranslation, setWordTranslation] = useState<WordTranslation | null>(null)
   const [loadingTranslation, setLoadingTranslation] = useState(false)
   const [addingWord, setAddingWord] = useState(false)
+  const [audioUpdating, setAudioUpdating] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isUploadedAudioPlaying, setIsUploadedAudioPlaying] = useState(false)
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null)
   const [readerMessage, setReaderMessage] = useState<string | null>(null)
   const [addedWords, setAddedWords] = useState<Set<string>>(new Set())
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const playbackTokenRef = useRef(0)
+  const uploadedAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const normalizedTitle = useMemo(() => normalizeBreaks(text?.title || ''), [text?.title])
   const normalizedContent = useMemo(() => normalizeBreaks(text?.content || ''), [text?.content])
+  const uploadedAudioUrl = useMemo(() => (text?.audio_url ? config.getFullUrl(text.audio_url) : ''), [text?.audio_url])
   const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
   const preferredVoice = useMemo(() => pickPreferredVoice(availableVoices), [availableVoices])
 
@@ -167,11 +183,39 @@ export default function ReaderTextPage() {
     return parsed?.state?.user?.id
   }
 
+  const stopTextPlayback = (updateState = true) => {
+    playbackTokenRef.current += 1
+
+    if (speechSupported) {
+      window.speechSynthesis.cancel()
+    }
+
+    if (updateState) {
+      setIsSpeaking(false)
+    }
+  }
+
+  const stopUploadedAudio = (reset = false, updateState = true) => {
+    const audio = uploadedAudioRef.current
+    if (!audio) {
+      return
+    }
+
+    audio.pause()
+    if (reset) {
+      audio.currentTime = 0
+    }
+    if (updateState) {
+      setIsUploadedAudioPlaying(false)
+    }
+  }
+
   useEffect(() => {
     void Promise.all([loadText(), loadActiveTarget()])
 
     return () => {
       stopTextPlayback(false)
+      stopUploadedAudio(true, false)
     }
   }, [id])
 
@@ -194,6 +238,40 @@ export default function ReaderTextPage() {
       window.speechSynthesis.onvoiceschanged = null
     }
   }, [speechSupported])
+
+  useEffect(() => {
+    if (!uploadedAudioUrl) {
+      stopUploadedAudio(true)
+      uploadedAudioRef.current = null
+      return
+    }
+
+    const audio = new Audio(uploadedAudioUrl)
+    audio.preload = 'metadata'
+
+    const handlePlay = () => setIsUploadedAudioPlaying(true)
+    const handlePause = () => setIsUploadedAudioPlaying(false)
+    const handleEnded = () => {
+      setIsUploadedAudioPlaying(false)
+      audio.currentTime = 0
+    }
+
+    audio.addEventListener('play', handlePlay)
+    audio.addEventListener('pause', handlePause)
+    audio.addEventListener('ended', handleEnded)
+    uploadedAudioRef.current = audio
+
+    return () => {
+      audio.removeEventListener('play', handlePlay)
+      audio.removeEventListener('pause', handlePause)
+      audio.removeEventListener('ended', handleEnded)
+      audio.pause()
+
+      if (uploadedAudioRef.current === audio) {
+        uploadedAudioRef.current = null
+      }
+    }
+  }, [uploadedAudioUrl])
 
   const loadActiveTarget = async () => {
     try {
@@ -282,18 +360,6 @@ export default function ReaderTextPage() {
     window.speechSynthesis.speak(utterance)
   }
 
-  const stopTextPlayback = (updateState = true) => {
-    playbackTokenRef.current += 1
-
-    if (speechSupported) {
-      window.speechSynthesis.cancel()
-    }
-
-    if (updateState) {
-      setIsSpeaking(false)
-    }
-  }
-
   const speakTextChunks = (chunks: string[], index: number, playbackToken: number) => {
     if (!speechSupported) {
       setIsSpeaking(false)
@@ -345,6 +411,7 @@ export default function ReaderTextPage() {
       return
     }
 
+    stopUploadedAudio()
     stopTextPlayback(false)
     const playbackToken = playbackTokenRef.current + 1
     playbackTokenRef.current = playbackToken
@@ -352,8 +419,51 @@ export default function ReaderTextPage() {
     speakTextChunks(chunks, 0, playbackToken)
   }
 
+  const handleToggleUploadedAudio = async () => {
+    const audio = uploadedAudioRef.current
+    if (!audio) {
+      return
+    }
+
+    setReaderMessage(null)
+
+    if (!audio.paused) {
+      audio.pause()
+      return
+    }
+
+    stopTextPlayback()
+
+    try {
+      await audio.play()
+    } catch (error) {
+      console.error('Error playing uploaded audio:', error)
+      setReaderMessage('Не удалось запустить загруженную озвучку.')
+    }
+  }
+
+  const handleRestartUploadedAudio = async () => {
+    const audio = uploadedAudioRef.current
+    if (!audio) {
+      return
+    }
+
+    setReaderMessage(null)
+    stopTextPlayback()
+    audio.currentTime = 0
+
+    try {
+      await audio.play()
+    } catch (error) {
+      console.error('Error restarting uploaded audio:', error)
+      setReaderMessage('Не удалось перезапустить загруженную озвучку.')
+    }
+  }
+
   const handleSpeakWord = () => {
     if (!wordTranslation) return
+
+    stopUploadedAudio()
 
     if (wordTranslation.audio_url) {
       const audio = new Audio(wordTranslation.audio_url)
@@ -362,6 +472,58 @@ export default function ReaderTextPage() {
     }
 
     speakText(wordTranslation.word)
+  }
+
+  const handleReplaceUploadedAudio = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    const input = event.target
+
+    if (!file || !text) {
+      return
+    }
+
+    const userId = getUserId()
+    if (!userId) {
+      setReaderMessage('Пользователь не авторизован.')
+      input.value = ''
+      return
+    }
+
+    const previousFilename = getUploadedAudioFilename(text.audio_url)
+    let uploadedAudio: { url: string; filename: string } | null = null
+
+    try {
+      setAudioUpdating(true)
+      setReaderMessage(null)
+
+      uploadedAudio = await uploadService.uploadAudio(file)
+
+      const response = await api.put<ReadingText>(`/reading-texts/${text.id}/audio`, {
+        user_id: userId,
+        audio_url: uploadedAudio.url,
+      })
+
+      setText(response.data)
+      setReaderMessage('Своя озвучка сохранена.')
+
+      if (previousFilename && previousFilename !== uploadedAudio.filename) {
+        void uploadService.deleteFile('audio', previousFilename).catch((cleanupError) => {
+          console.error('Error deleting old uploaded audio:', cleanupError)
+        })
+      }
+    } catch (error) {
+      if (uploadedAudio?.filename) {
+        void uploadService.deleteFile('audio', uploadedAudio.filename).catch((cleanupError) => {
+          console.error('Error deleting new uploaded audio after failed update:', cleanupError)
+        })
+      }
+
+      console.error('Error updating uploaded audio:', error)
+      setReaderMessage('Не удалось сохранить свою озвучку.')
+    } finally {
+      setAudioUpdating(false)
+      input.value = ''
+    }
   }
 
   const handleAddToDictionary = async () => {
@@ -390,12 +552,12 @@ export default function ReaderTextPage() {
 
   const renderInteractiveText = (content: string) => {
     return content.split(/\n+/).map((line, lineIndex) => {
-      const parts = line.split(/(\s+|[.,!?;:"'()[\]{}—–-])/g)
+      const parts = line.split(/(\s+|[.,!?;:"'()[\]{}—-])/g)
       return (
         <p key={lineIndex} className="mb-4">
           {parts.map((part, partIndex) => {
             if (!part) return null
-            if (/^\s+$/.test(part) || /^[.,!?;:"'()[\]{}—–-]$/.test(part)) {
+            if (/^\s+$/.test(part) || /^[.,!?;:"'()[\]{}—-]$/.test(part)) {
               return <span key={partIndex}>{part}</span>
             }
 
@@ -435,7 +597,7 @@ export default function ReaderTextPage() {
               onClick={() => navigate('/reader')}
               className="font-semibold text-link-light transition-colors hover:text-link-dark"
             >
-              ← Назад
+              Назад
             </button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -449,18 +611,44 @@ export default function ReaderTextPage() {
                     Дек: {activeDeck.title}
                   </span>
                 )}
+                {uploadedAudioUrl && (
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                    Есть mp3
+                  </span>
+                )}
               </div>
               <h1 className="mt-2 whitespace-pre-line text-2xl font-bold text-gray-800">{normalizedTitle}</h1>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleSpeakText}
-            className="rounded-2xl bg-link-light px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-link-dark"
-          >
-            {isSpeaking ? 'Остановить озвучку' : 'Озвучить текст'}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {uploadedAudioUrl && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleUploadedAudio()}
+                  className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                >
+                  {isUploadedAudioPlaying ? 'Пауза mp3' : 'Запустить mp3'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRestartUploadedAudio()}
+                  className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  С начала
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSpeakText}
+              className="rounded-2xl bg-link-light px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-link-dark"
+            >
+              {isSpeaking ? 'Остановить озвучку' : uploadedAudioUrl ? 'Озвучить браузером' : 'Озвучить текст'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -504,6 +692,56 @@ export default function ReaderTextPage() {
           </div>
 
           <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-text-light">Своя озвучка</h2>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  {uploadedAudioUrl ? 'Заменить mp3' : 'Загрузить mp3'}
+                </span>
+                <input
+                  type="file"
+                  accept=".mp3,audio/*"
+                  onChange={handleReplaceUploadedAudio}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:border-link-light focus:outline-none"
+                  disabled={audioUpdating}
+                />
+              </label>
+
+              {audioUpdating && (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-800">
+                  Сохраняю аудио...
+                </div>
+              )}
+            </div>
+
+            {uploadedAudioUrl ? (
+              <div className="mt-4 space-y-3 text-sm text-slate-600">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-800">
+                  Для этого текста загружен собственный аудиофайл.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleUploadedAudio()}
+                  className="w-full rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700"
+                >
+                  {isUploadedAudioPlaying ? 'Поставить на паузу' : 'Включить mp3'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRestartUploadedAudio()}
+                  className="w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  Запустить сначала
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Для этого текста пока не загружена своя mp3-озвучка. Добавить ее можно при создании текста в reader.
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
             {loadingTranslation ? (
               <p className="text-center text-sm text-slate-500">Загрузка перевода...</p>
             ) : wordTranslation ? (
@@ -529,7 +767,7 @@ export default function ReaderTextPage() {
                       onClick={() => setWordTranslation(null)}
                       className="text-2xl text-slate-400 transition-colors hover:text-slate-600"
                     >
-                      ×
+                      x
                     </button>
                   </div>
                 </div>

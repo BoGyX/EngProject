@@ -18,9 +18,15 @@ func NewReadingTextHandler(textService *services.ReadingTextService) *ReadingTex
 }
 
 type CreateReadingTextRequest struct {
-	UserID  string `json:"user_id" binding:"required"`
-	Title   string `json:"title" binding:"required"`
-	Content string `json:"content" binding:"required"`
+	UserID   string `json:"user_id" binding:"required"`
+	Title    string `json:"title" binding:"required"`
+	Content  string `json:"content" binding:"required"`
+	AudioURL string `json:"audio_url"`
+}
+
+type UpdateReadingTextAudioRequest struct {
+	UserID   string `json:"user_id" binding:"required"`
+	AudioURL string `json:"audio_url" binding:"required"`
 }
 
 // GetAllReadingTexts возвращает все тексты пользователя
@@ -90,7 +96,7 @@ func (h *ReadingTextHandler) CreateReadingText(c *gin.Context) {
 		return
 	}
 
-	text, err := h.textService.Create(userID, req.Title, req.Content)
+	text, err := h.textService.Create(userID, req.Title, req.Content, req.AudioURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -127,4 +133,33 @@ func (h *ReadingTextHandler) DeleteReadingText(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Text deleted successfully"})
+}
+
+func (h *ReadingTextHandler) UpdateReadingTextAudio(c *gin.Context) {
+	idParam := c.Param("id")
+	textID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid text ID format"})
+		return
+	}
+
+	var req UpdateReadingTextAudioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id format"})
+		return
+	}
+
+	text, err := h.textService.UpdateAudio(textID, userID, req.AudioURL)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, text)
 }

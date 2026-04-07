@@ -114,6 +114,19 @@ CREATE TABLE personal_vocabulary (
 -- USER_COURSES (подписка на курс / общий прогресс)
 -- Содержит общий прогресс по курсу
 -- ===================================
+-- ===================================
+-- READING_TEXTS (reader texts)
+-- ===================================
+CREATE TABLE reading_texts (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    audio_url TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE user_courses (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -265,6 +278,7 @@ CREATE INDEX idx_personal_vocabulary_word ON personal_vocabulary(word);
 -- Индекс для поиска по тегам (GIN индекс для массивов)
 CREATE INDEX idx_personal_vocabulary_tags ON personal_vocabulary USING GIN(tags);
 
+CREATE INDEX idx_reading_texts_user_id ON reading_texts(user_id);
 CREATE INDEX idx_user_courses_user ON user_courses(user_id);
 CREATE INDEX idx_user_courses_user_course ON user_courses(user_id, course_id);
 CREATE INDEX idx_user_courses_attempt ON user_courses(user_id, course_id, attempt_number);
