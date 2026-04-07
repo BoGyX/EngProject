@@ -12,10 +12,16 @@ import (
 
 type CourseHandler struct {
 	courseService *services.CourseService
+	deckService   *services.DeckService
+	cardService   *services.CardService
 }
 
-func NewCourseHandler(courseService *services.CourseService) *CourseHandler {
-	return &CourseHandler{courseService: courseService}
+func NewCourseHandler(courseService *services.CourseService, deckService *services.DeckService, cardService *services.CardService) *CourseHandler {
+	return &CourseHandler{
+		courseService: courseService,
+		deckService:   deckService,
+		cardService:   cardService,
+	}
 }
 
 func isAdminRequest(c *gin.Context) bool {

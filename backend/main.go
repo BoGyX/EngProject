@@ -217,7 +217,7 @@ func main() {
 		cfg.Moodle.OnlyAuth,
 		cfg.Moodle.AutoCreate,
 	)
-	courseHandler := handlers.NewCourseHandler(courseService)
+	courseHandler := handlers.NewCourseHandler(courseService, deckService, cardService)
 	deckHandler := handlers.NewDeckHandler(deckService)
 	cardHandler := handlers.NewCardHandler(cardService, userDeckService)
 	vocabHandler := handlers.NewPersonalVocabularyHandler(vocabService)
@@ -409,6 +409,7 @@ func main() {
 			// Admin Courses
 			admin.GET("/courses", courseHandler.GetAdminCourses)
 			admin.POST("/courses", courseHandler.CreateCourse)
+			admin.POST("/courses/import", courseHandler.CreateCourseFromImport)
 			admin.PUT("/courses/:id", courseHandler.UpdateCourse)
 			admin.DELETE("/courses/:id", courseHandler.DeleteCourse)
 			admin.POST("/courses/:id/publish", courseHandler.PublishCourse)

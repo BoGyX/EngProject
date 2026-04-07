@@ -73,6 +73,12 @@ export interface Podcast {
   updated_at: string
 }
 
+export interface ImportCourseResponse {
+  course: Course
+  lessons_count: number
+  cards_count: number
+}
+
 export const adminService = {
   // Courses
   async getAllCourses(): Promise<Course[]> {
@@ -87,6 +93,29 @@ export const adminService = {
 
   async createCourse(data: CreateCourseRequest): Promise<Course> {
     const response = await api.post<Course>('/admin/courses', data)
+    return response.data
+  },
+
+  async importCourse(data: CreateCourseRequest, importFile: File): Promise<ImportCourseResponse> {
+    const formData = new FormData()
+    formData.append('title', data.title)
+
+    if (data.slug) {
+      formData.append('slug', data.slug)
+    }
+
+    if (data.description) {
+      formData.append('description', data.description)
+    }
+
+    if (data.image_url) {
+      formData.append('image_url', data.image_url)
+    }
+
+    formData.append('is_published', String(Boolean(data.is_published)))
+    formData.append('import_file', importFile)
+
+    const response = await api.post<ImportCourseResponse>('/admin/courses/import', formData)
     return response.data
   },
 
