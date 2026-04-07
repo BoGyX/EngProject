@@ -88,3 +88,20 @@ func (s *ReadingTextService) Delete(textID int64, userID uuid.UUID) error {
 
 	return nil
 }
+
+func (s *ReadingTextService) UpdateAudio(textID int64, userID uuid.UUID, audioURL string) (*models.ReadingText, error) {
+	var text models.ReadingText
+	err := s.db.QueryRow(context.Background(),
+		`UPDATE reading_texts
+		 SET audio_url = $3, updated_at = NOW()
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, title, content, audio_url, created_at, updated_at`,
+		textID, userID, audioURL,
+	).Scan(&text.ID, &text.UserID, &text.Title, &text.Content, &text.AudioURL, &text.CreatedAt, &text.UpdatedAt)
+
+	if err != nil {
+		return nil, errors.New("text not found")
+	}
+
+	return &text, nil
+}
