@@ -154,6 +154,14 @@ func (h *TrainingSessionHandler) StartTrainingSession(c *gin.Context) {
 
 	session, err := h.trainingSessionService.StartScopedTrainingSession(userID, req.CourseID, req.DeckID)
 	if err != nil {
+		if services.IsCourseProgressLockError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		if err.Error() == "no unfinished cards available for training" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

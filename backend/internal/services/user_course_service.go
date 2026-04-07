@@ -91,6 +91,11 @@ func (s *UserCourseService) GetUserCoursesByUserID(userID uuid.UUID) ([]models.U
 
 // StartCourse создает новую запись о начале курса пользователем
 func (s *UserCourseService) StartCourse(userID uuid.UUID, courseID int64) (*models.UserCourse, error) {
+	if lockErr, err := findBlockingCourseProgress(context.Background(), s.db, userID, courseID); err != nil {
+		return nil, err
+	} else if lockErr != nil {
+		return nil, lockErr
+	}
 	// Получаем количество дек в курсе
 	var totalDecks int
 	err := s.db.QueryRow(context.Background(),
@@ -220,6 +225,11 @@ func (s *UserCourseService) ActivateCourse(userID uuid.UUID, courseID int64) (*m
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	if lockErr, err := findBlockingCourseProgress(ctx, tx, userID, courseID); err != nil {
+		return nil, err
+	} else if lockErr != nil {
+		return nil, lockErr
+	}
 
 	var course models.UserCourse
 	err = tx.QueryRow(ctx,

@@ -205,6 +205,11 @@ func (s *UserDeckService) ActivateDeck(userID uuid.UUID, deckID int64) (*models.
 	if err := tx.QueryRow(ctx, "SELECT course_id FROM decks WHERE id = $1", deckID).Scan(&courseID); err != nil {
 		return nil, errors.New("deck not found")
 	}
+	if lockErr, err := findBlockingCourseProgress(ctx, tx, userID, courseID); err != nil {
+		return nil, err
+	} else if lockErr != nil {
+		return nil, lockErr
+	}
 
 	var userCourseID int64
 	err = tx.QueryRow(ctx,

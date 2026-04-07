@@ -113,6 +113,19 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 	if err != nil {
 		return nil, err
 	}
+	if openSessionID, err := s.getLatestOpenScopedSessionID(userID, userDeck.ID); err != nil {
+		return nil, err
+	} else if openSessionID != 0 {
+		existingState, err := s.GetTrainingSessionStateByID(openSessionID, &userID)
+		if err == nil && existingState != nil {
+			if existingState.CurrentCard != nil {
+				return existingState, nil
+			}
+			if _, finishErr := s.FinishTrainingSession(openSessionID); finishErr != nil {
+				return nil, finishErr
+			}
+		}
+	}
 
 	cardIDs, err := s.getAvailableScopedCardIDs(userID, userDeck)
 	if err != nil {
@@ -120,11 +133,6 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 	}
 	if len(cardIDs) == 0 {
 		return nil, errors.New("no unfinished cards available for training")
-	}
-
-	shuffleInt64Values(cardIDs)
-	if len(cardIDs) > 10 {
-		cardIDs = cardIDs[:10]
 	}
 
 	ctx := context.Background()
@@ -368,6 +376,28 @@ func (s *TrainingSessionService) getSessionCardForUpdate(ctx context.Context, tx
 	}
 
 	return &sessionCard, nil
+}
+
+func (s *TrainingSessionService) getLatestOpenScopedSessionID(userID uuid.UUID, userDeckID int64) (int64, error) {
+	var sessionID int64
+	err := s.db.QueryRow(context.Background(),
+		`SELECT id
+		 FROM training_sessions
+		 WHERE user_id = $1
+		   AND user_deck_id = $2
+		   AND finished_at IS NULL
+		 ORDER BY started_at DESC, id DESC
+		 LIMIT 1`,
+		userID, userDeckID,
+	).Scan(&sessionID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return sessionID, nil
 }
 
 func (s *TrainingSessionService) resolveScopedUserDeck(userID uuid.UUID, courseID *int64, deckID *int64) (*models.UserDeck, *int64, error) {

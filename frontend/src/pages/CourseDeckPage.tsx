@@ -4,6 +4,7 @@ import StudySessionModal from '../components/StudySessionModal'
 import { config } from '../config'
 import { useAuthStore } from '../store/authStore'
 import { Card, Course, Deck, UserCourse, UserDeck, studyService } from '../services/studyService'
+import { buildLatestUserCourseMap, getBlockingUserCourse, normalizeCourseProgress } from '../utils/courseProgress'
 
 type DeckState = 'completed' | 'active' | 'available' | 'locked'
 
@@ -125,6 +126,7 @@ export default function CourseDeckPage() {
 
   const [course, setCourse] = useState<Course | null>(null)
   const [decks, setDecks] = useState<Deck[]>([])
+  const [userCourses, setUserCourses] = useState<UserCourse[]>([])
   const [userDecks, setUserDecks] = useState<UserDeck[]>([])
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null)
   const [cards, setCards] = useState<Card[]>([])
@@ -169,6 +171,28 @@ export default function CourseDeckPage() {
     }
   }, [deckPresentations])
 
+  const latestUserCourseMap = useMemo(() => buildLatestUserCourseMap(userCourses), [userCourses])
+
+  const currentUserCourse = useMemo(() => {
+    if (!course) {
+      return null
+    }
+
+    return latestUserCourseMap.get(course.id) || null
+  }, [course, latestUserCourseMap])
+
+  const blockingUserCourse = useMemo(() => getBlockingUserCourse(userCourses), [userCourses])
+  const blockingCourseProgress = normalizeCourseProgress(blockingUserCourse?.progress_percentage)
+  const isBlockedByAnotherCourse = Boolean(
+    course &&
+      blockingUserCourse &&
+      blockingUserCourse.course_id !== course.id &&
+      blockingCourseProgress < 100
+  )
+  const courseLockMessage = isBlockedByAnotherCourse
+    ? `Сначала завершите текущий курс на 100%. Сейчас: ${blockingCourseProgress}%.`
+    : null
+
   const canUseProtectedStudyActions = Boolean(isAuthenticated && hasUsableAccessToken(accessToken))
 
   useEffect(() => {
@@ -204,25 +228,19 @@ export default function CourseDeckPage() {
 
       setCourse(loadedCourse)
 
-      if (canUseProtectedStudyActions) {
-        try {
-          await studyService.activateCourse(loadedCourse.id)
-        } catch (error) {
-          console.error('Error activating course:', error)
-        }
-      }
-
       const loadedDecks = await studyService.getDecksByCourse(loadedCourse.id)
       setDecks(loadedDecks)
 
-      const [nextActiveCourse, nextActiveDeck, nextUserDecks] = await Promise.all([
+      const [nextActiveCourse, nextActiveDeck, nextUserDecks, nextUserCourses] = await Promise.all([
         canUseProtectedStudyActions ? studyService.getActiveCourse().catch(() => null) : Promise.resolve(null),
         canUseProtectedStudyActions ? studyService.getActiveDeck().catch(() => null) : Promise.resolve(null),
         canUseProtectedStudyActions && user?.id ? studyService.getUserDecks(user.id).catch(() => []) : Promise.resolve([]),
+        canUseProtectedStudyActions && user?.id ? studyService.getUserCourses(user.id).catch(() => []) : Promise.resolve([]),
       ])
 
       setActiveCourse(nextActiveCourse)
       setActiveDeck(nextActiveDeck)
+      setUserCourses(nextUserCourses)
 
       const scopedUserDecks = nextUserDecks.filter((userDeck) => loadedDecks.some((deck) => deck.id === userDeck.deck_id))
       setUserDecks(scopedUserDecks)
@@ -247,7 +265,7 @@ export default function CourseDeckPage() {
           navigate(`/deck/${loadedCourse.slug}/${targetDeck.slug}`, { replace: true })
         }
 
-        await handleDeckSelect(targetDeck, loadedCourse, false, loadedDecks, scopedUserDecks, nextActiveDeck?.deck_id)
+        await handleDeckSelect(targetDeck, loadedCourse, false, loadedDecks, scopedUserDecks, nextActiveDeck?.deck_id, false)
       } else {
         setSelectedDeck(null)
         setCards([])
@@ -256,6 +274,7 @@ export default function CourseDeckPage() {
       console.error('Error loading course detail:', error)
       setCourse(null)
       setDecks([])
+      setUserCourses([])
       setUserDecks([])
       setSelectedDeck(null)
       setCards([])
@@ -282,7 +301,8 @@ export default function CourseDeckPage() {
     pushHistory = true,
     availableDecks = decks,
     availableUserDecks = userDecks,
-    activeDeckId = activeDeck?.deck_id
+    activeDeckId = activeDeck?.deck_id,
+    activateSelection = true
   ) => {
     const scopedDecks = availableDecks.length ? availableDecks : [deck]
     const deckState = buildDeckPresentations(loadedCourse || null, scopedDecks, availableUserDecks, activeDeckId).find((item) => item.deck.id === deck.id)
@@ -294,6 +314,24 @@ export default function CourseDeckPage() {
 
     setSelectionMessage(null)
     setSelectedDeck(deck)
+
+    await loadCards(deck.id)
+
+    if (pushHistory && courseSlug && loadedCourse?.slug && deck.slug) {
+      navigate(`/deck/${loadedCourse.slug}/${deck.slug}`)
+    }
+
+    if (!activateSelection || !canUseProtectedStudyActions) {
+      if (activateSelection && courseLockMessage) {
+        setSelectionMessage(courseLockMessage)
+      }
+      return
+    }
+
+    if (courseLockMessage) {
+      setSelectionMessage(courseLockMessage)
+      return
+    }
 
     if (canUseProtectedStudyActions) {
       try {
@@ -309,15 +347,9 @@ export default function CourseDeckPage() {
         await refreshScopedUserDecks(scopedDecks)
       } catch (error: any) {
         console.error('Error activating deck:', error)
-      setSelectionMessage(error?.response?.data?.error || 'Не удалось открыть дек.')
-      return
-    }
-    }
-
-    await loadCards(deck.id)
-
-    if (pushHistory && courseSlug && loadedCourse?.slug && deck.slug) {
-      navigate(`/deck/${loadedCourse.slug}/${deck.slug}`)
+        setSelectionMessage(error?.response?.data?.error || 'Не удалось открыть дек.')
+        return
+      }
     }
   }
 
@@ -326,6 +358,27 @@ export default function CourseDeckPage() {
     const audio = new Audio(normalizedUrl)
     audio.play().catch((error) => console.error('Error playing audio:', error))
   }
+
+  const handleStartStudy = () => {
+    if (!selectedDeck) {
+      return
+    }
+
+    if (!canUseProtectedStudyActions) {
+      setSelectionMessage('Войдите в аккаунт, чтобы начать обучение.')
+      return
+    }
+
+    if (courseLockMessage) {
+      setSelectionMessage(courseLockMessage)
+      return
+    }
+
+    setSelectionMessage(null)
+    setShowStudyModal(true)
+  }
+
+  const canStartStudy = Boolean(selectedDeck && !loadingCards && cards.length > 0 && canUseProtectedStudyActions && !courseLockMessage)
 
   if (loading) {
     return <div className="py-8 text-center text-text-light">Загрузка курса...</div>
@@ -380,6 +433,11 @@ export default function CourseDeckPage() {
                   Текущий курс
                 </span>
               )}
+              {currentUserCourse && activeCourse?.course_id !== course.id && (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Прогресс: {normalizeCourseProgress(currentUserCourse.progress_percentage)}%
+                </span>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -425,6 +483,12 @@ export default function CourseDeckPage() {
       {selectionMessage && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {selectionMessage}
+        </div>
+      )}
+
+      {!selectionMessage && courseLockMessage && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {courseLockMessage}
         </div>
       )}
 
@@ -590,20 +654,17 @@ export default function CourseDeckPage() {
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-link-light">Режим прохождения</p>
                     <p className="mt-2 text-base text-slate-600">
-                      В тренировке будет
-                      {' '}
-                      <span className="font-semibold text-text-light">до 10 случайных слов</span>
-                      {' '}
-                      из этого дека. Слово не перейдёт к следующему виду, пока не пройдёт текущий.
+                      Тренировка идёт по незавершённым словам этого дека по порядку. Если ответ неверный,
+                      слово остаётся в текущем режиме и не теряется до новой сессии.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowStudyModal(true)}
-                    disabled={loadingCards || cards.length === 0}
+                    onClick={handleStartStudy}
+                    disabled={!canStartStudy}
                     className="rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Начать обучение
+                    {courseLockMessage ? 'Сначала завершите текущий курс' : 'Начать обучение'}
                   </button>
                 </div>
               </div>
@@ -722,7 +783,7 @@ export default function CourseDeckPage() {
           deck={selectedDeck}
           onClose={() => {
             setShowStudyModal(false)
-            void refreshScopedUserDecks(decks)
+            void loadCourseData()
           }}
         />
       )}

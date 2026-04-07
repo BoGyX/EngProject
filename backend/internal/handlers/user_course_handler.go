@@ -145,6 +145,10 @@ func (h *UserCourseHandler) ActivateCourse(c *gin.Context) {
 
 	userCourse, err := h.userCourseService.ActivateCourse(userID, courseID)
 	if err != nil {
+		if services.IsCourseProgressLockError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -178,6 +182,10 @@ func (h *UserCourseHandler) StartCourse(c *gin.Context) {
 
 	userCourse, err := h.userCourseService.StartCourse(userID, req.CourseID)
 	if err != nil {
+		if services.IsCourseProgressLockError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

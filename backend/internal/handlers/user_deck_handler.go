@@ -147,6 +147,10 @@ func (h *UserDeckHandler) ActivateDeck(c *gin.Context) {
 
 	userDeck, err := h.userDeckService.ActivateDeck(userID, deckID)
 	if err != nil {
+		if services.IsCourseProgressLockError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
