@@ -188,9 +188,20 @@ func (s *UserService) DeleteRefreshToken(token string) error {
 
 // UpdateUserRole обновляет роль пользователя
 func (s *UserService) UpdateUserRole(userID uuid.UUID, role string) error {
-	_, err := s.db.Exec(context.Background(),
+	if role != "user" && role != "admin" {
+		return errors.New("invalid role")
+	}
+
+	result, err := s.db.Exec(context.Background(),
 		"UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2",
 		role, userID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("user not found")
+	}
+
+	return nil
 }

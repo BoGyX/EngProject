@@ -154,6 +154,14 @@ func (h *TrainingSessionHandler) StartTrainingSession(c *gin.Context) {
 
 	session, err := h.trainingSessionService.StartScopedTrainingSession(userID, req.CourseID, req.DeckID)
 	if err != nil {
+		if err.Error() == "course access denied" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		if err.Error() == "deck is locked until previous decks are completed" {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		if services.IsCourseProgressLockError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return

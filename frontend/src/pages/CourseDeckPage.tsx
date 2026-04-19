@@ -4,7 +4,7 @@ import StudySessionModal from '../components/StudySessionModal'
 import { config } from '../config'
 import { useAuthStore } from '../store/authStore'
 import { Card, Course, Deck, UserCourse, UserDeck, studyService } from '../services/studyService'
-import { buildLatestUserCourseMap, getBlockingUserCourse, normalizeCourseProgress } from '../utils/courseProgress'
+import { buildLatestUserCourseMap, normalizeCourseProgress } from '../utils/courseProgress'
 
 type DeckState = 'completed' | 'active' | 'available' | 'locked'
 
@@ -181,18 +181,6 @@ export default function CourseDeckPage() {
     return latestUserCourseMap.get(course.id) || null
   }, [course, latestUserCourseMap])
 
-  const blockingUserCourse = useMemo(() => getBlockingUserCourse(userCourses), [userCourses])
-  const blockingCourseProgress = normalizeCourseProgress(blockingUserCourse?.progress_percentage)
-  const isBlockedByAnotherCourse = Boolean(
-    course &&
-      blockingUserCourse &&
-      blockingUserCourse.course_id !== course.id &&
-      blockingCourseProgress < 100
-  )
-  const courseLockMessage = isBlockedByAnotherCourse
-    ? `Сначала завершите текущий курс на 100%. Сейчас: ${blockingCourseProgress}%.`
-    : null
-
   const canUseProtectedStudyActions = Boolean(isAuthenticated && hasUsableAccessToken(accessToken))
 
   useEffect(() => {
@@ -322,14 +310,6 @@ export default function CourseDeckPage() {
     }
 
     if (!activateSelection || !canUseProtectedStudyActions) {
-      if (activateSelection && courseLockMessage) {
-        setSelectionMessage(courseLockMessage)
-      }
-      return
-    }
-
-    if (courseLockMessage) {
-      setSelectionMessage(courseLockMessage)
       return
     }
 
@@ -369,16 +349,11 @@ export default function CourseDeckPage() {
       return
     }
 
-    if (courseLockMessage) {
-      setSelectionMessage(courseLockMessage)
-      return
-    }
-
     setSelectionMessage(null)
     setShowStudyModal(true)
   }
 
-  const canStartStudy = Boolean(selectedDeck && !loadingCards && cards.length > 0 && canUseProtectedStudyActions && !courseLockMessage)
+  const canStartStudy = Boolean(selectedDeck && !loadingCards && cards.length > 0 && canUseProtectedStudyActions)
 
   if (loading) {
     return <div className="py-8 text-center text-text-light">Загрузка курса...</div>
@@ -483,12 +458,6 @@ export default function CourseDeckPage() {
       {selectionMessage && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {selectionMessage}
-        </div>
-      )}
-
-      {!selectionMessage && courseLockMessage && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {courseLockMessage}
         </div>
       )}
 
@@ -664,7 +633,7 @@ export default function CourseDeckPage() {
                     disabled={!canStartStudy}
                     className="rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {courseLockMessage ? 'Сначала завершите текущий курс' : 'Начать обучение'}
+                    Начать обучение
                   </button>
                 </div>
               </div>

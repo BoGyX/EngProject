@@ -47,6 +47,11 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to update training schema: %w", err)
 	}
 
+	if err := ensureCourseAccessCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update course access schema: %w", err)
+	}
+
 	if err := ensureReadingTextCompatibility(pool); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to update reading_texts schema: %w", err)
@@ -252,5 +257,64 @@ CREATE INDEX IF NOT EXISTS idx_reading_texts_course_id ON reading_texts(course_i
 	}
 
 	log.Println("reading_texts schema is up to date")
+	return nil
+}
+
+func ensureCourseAccessCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking course_accesses schema...")
+
+	compatSQL := `
+CREATE TABLE IF NOT EXISTS course_accesses (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    granted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, course_id)
+);
+
+ALTER TABLE course_accesses
+    ADD COLUMN IF NOT EXISTS granted_by UUID,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW();
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'course_accesses_granted_by_fkey'
+    ) THEN
+        ALTER TABLE course_accesses
+            ADD CONSTRAINT course_accesses_granted_by_fkey
+            FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_course_accesses_user ON course_accesses(user_id);
+CREATE INDEX IF NOT EXISTS idx_course_accesses_course ON course_accesses(course_id);
+
+INSERT INTO course_accesses (user_id, course_id, granted_by)
+SELECT DISTINCT uc.user_id, uc.course_id, NULL
+FROM user_courses uc
+WHERE uc.user_id IS NOT NULL
+  AND uc.course_id IS NOT NULL
+ON CONFLICT (user_id, course_id) DO NOTHING;
+
+INSERT INTO course_accesses (user_id, course_id, granted_by)
+SELECT DISTINCT ud.user_id, d.course_id, NULL
+FROM user_decks ud
+JOIN decks d ON d.id = ud.deck_id
+WHERE ud.user_id IS NOT NULL
+  AND d.course_id IS NOT NULL
+ON CONFLICT (user_id, course_id) DO NOTHING;
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("course_accesses schema is up to date")
 	return nil
 }

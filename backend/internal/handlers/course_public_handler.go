@@ -41,8 +41,7 @@ func (h *CourseHandler) GetAccessibleCourseByID(c *gin.Context) {
 		return
 	}
 
-	if !course.IsPublished && !isAdminRequest(c) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
+	if !ensureCourseAccess(c, h.courseAccessService, course) {
 		return
 	}
 
@@ -58,8 +57,7 @@ func (h *CourseHandler) GetAccessibleCourseBySlug(c *gin.Context) {
 		return
 	}
 
-	if !course.IsPublished && !isAdminRequest(c) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
+	if !ensureCourseAccess(c, h.courseAccessService, course) {
 		return
 	}
 

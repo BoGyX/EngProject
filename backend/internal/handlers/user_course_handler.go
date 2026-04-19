@@ -145,6 +145,10 @@ func (h *UserCourseHandler) ActivateCourse(c *gin.Context) {
 
 	userCourse, err := h.userCourseService.ActivateCourse(userID, courseID)
 	if err != nil {
+		if err.Error() == "course access denied" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		if services.IsCourseProgressLockError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
@@ -182,6 +186,10 @@ func (h *UserCourseHandler) StartCourse(c *gin.Context) {
 
 	userCourse, err := h.userCourseService.StartCourse(userID, req.CourseID)
 	if err != nil {
+		if err.Error() == "course access denied" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		if services.IsCourseProgressLockError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return

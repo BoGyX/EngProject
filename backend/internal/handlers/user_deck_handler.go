@@ -147,6 +147,14 @@ func (h *UserDeckHandler) ActivateDeck(c *gin.Context) {
 
 	userDeck, err := h.userDeckService.ActivateDeck(userID, deckID)
 	if err != nil {
+		if err.Error() == "course access denied" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		if err.Error() == "deck is locked until previous decks are completed" {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		if services.IsCourseProgressLockError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
@@ -184,6 +192,10 @@ func (h *UserDeckHandler) StartDeck(c *gin.Context) {
 
 	userDeck, err := h.userDeckService.StartDeck(userID, req.DeckID, req.UserCourseID)
 	if err != nil {
+		if err.Error() == "course access denied" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

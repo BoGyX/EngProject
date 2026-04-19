@@ -30,6 +30,14 @@ CREATE TABLE courses (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE course_accesses (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    granted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (user_id, course_id)
+);
+
 -- ===================================
 -- DECKS / LESSONS (подразделы курса)
 -- Например: урок биологии, химии в курсе "Школа"
@@ -263,6 +271,8 @@ CREATE TABLE refresh_tokens (
 -- ===================================
 CREATE INDEX idx_courses_published ON courses(is_published);
 CREATE INDEX idx_courses_slug ON courses(slug);
+CREATE INDEX idx_course_accesses_user ON course_accesses(user_id);
+CREATE INDEX idx_course_accesses_course ON course_accesses(course_id);
 CREATE INDEX idx_decks_course ON decks(course_id);
 CREATE INDEX idx_decks_course_slug ON decks(course_id, slug);
 CREATE INDEX idx_cards_deck ON cards(deck_id);

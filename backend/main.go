@@ -160,6 +160,7 @@ func main() {
 	// Инициализируем сервисы
 	userService := services.NewUserService(db)
 	courseService := services.NewCourseService(db)
+	courseAccessService := services.NewCourseAccessService(db)
 	deckService := services.NewDeckService(db)
 	cardService := services.NewCardService(db)
 	vocabService := services.NewPersonalVocabularyService(db)
@@ -207,7 +208,7 @@ func main() {
 	}
 
 	// Инициализируем handlers
-	userHandler := handlers.NewUserHandler(userService)
+	userHandler := handlers.NewUserHandler(userService, courseAccessService)
 	authHandler := handlers.NewAuthHandler(
 		userService,
 		moodleService,
@@ -217,9 +218,9 @@ func main() {
 		cfg.Moodle.OnlyAuth,
 		cfg.Moodle.AutoCreate,
 	)
-	courseHandler := handlers.NewCourseHandler(courseService, deckService, cardService, dictionaryService)
-	deckHandler := handlers.NewDeckHandler(deckService)
-	cardHandler := handlers.NewCardHandler(cardService, userDeckService)
+	courseHandler := handlers.NewCourseHandler(courseService, deckService, cardService, dictionaryService, courseAccessService)
+	deckHandler := handlers.NewDeckHandler(deckService, courseService, courseAccessService)
+	cardHandler := handlers.NewCardHandler(cardService, userDeckService, deckService, courseService, courseAccessService)
 	vocabHandler := handlers.NewPersonalVocabularyHandler(vocabService)
 	userCourseHandler := handlers.NewUserCourseHandler(userCourseService)
 	userDeckHandler := handlers.NewUserDeckHandler(userDeckService)
@@ -317,13 +318,13 @@ func main() {
 		api.GET("/courses/:id", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseByID)
 
 		// Decks endpoints (публичные - только чтение)
-		api.GET("/decks", deckHandler.GetAllDecks)
-		api.GET("/decks/by-slug/:course_slug/:deck_slug", deckHandler.GetDeckBySlug)
-		api.GET("/decks/:id", deckHandler.GetDeckByID)
+		api.GET("/decks", middleware.OptionalAuth(cfg.JWT.Secret), deckHandler.GetAllDecks)
+		api.GET("/decks/by-slug/:course_slug/:deck_slug", middleware.OptionalAuth(cfg.JWT.Secret), deckHandler.GetDeckBySlug)
+		api.GET("/decks/:id", middleware.OptionalAuth(cfg.JWT.Secret), deckHandler.GetDeckByID)
 
 		// Cards endpoints (публичные - чтение и создание)
-		api.GET("/cards", cardHandler.GetAllCards)
-		api.GET("/cards/:id", cardHandler.GetCardByID)
+		api.GET("/cards", middleware.OptionalAuth(cfg.JWT.Secret), cardHandler.GetAllCards)
+		api.GET("/cards/:id", middleware.OptionalAuth(cfg.JWT.Secret), cardHandler.GetCardByID)
 		api.POST("/cards", cardHandler.CreateCard)
 
 		// Personal Vocabulary endpoints
@@ -406,6 +407,13 @@ func main() {
 		admin.Use(middleware.Auth(cfg.JWT.Secret))
 		admin.Use(middleware.Admin())
 		{
+			// Admin Users
+			admin.GET("/users", userHandler.GetAllUsers)
+			admin.PUT("/users/:id/role", userHandler.UpdateUserRole)
+			admin.GET("/users/course-accesses", userHandler.GetAllCourseAccesses)
+			admin.POST("/users/:id/course-accesses/:course_id", userHandler.GrantCourseAccess)
+			admin.DELETE("/users/:id/course-accesses/:course_id", userHandler.RevokeCourseAccess)
+
 			// Admin Courses
 			admin.GET("/courses", courseHandler.GetAdminCourses)
 			admin.POST("/courses", courseHandler.CreateCourse)

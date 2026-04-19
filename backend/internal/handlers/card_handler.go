@@ -11,15 +11,29 @@ import (
 )
 
 type CardHandler struct {
-	cardService     *services.CardService
-	userDeckService *services.UserDeckService
+	cardService         *services.CardService
+	userDeckService     *services.UserDeckService
+	deckService         *services.DeckService
+	courseService       *services.CourseService
+	courseAccessService *services.CourseAccessService
 }
 
-func NewCardHandler(cardService *services.CardService, userDeckService *services.UserDeckService) *CardHandler {
-	return &CardHandler{cardService: cardService, userDeckService: userDeckService}
+func NewCardHandler(
+	cardService *services.CardService,
+	userDeckService *services.UserDeckService,
+	deckService *services.DeckService,
+	courseService *services.CourseService,
+	courseAccessService *services.CourseAccessService,
+) *CardHandler {
+	return &CardHandler{
+		cardService:         cardService,
+		userDeckService:     userDeckService,
+		deckService:         deckService,
+		courseService:       courseService,
+		courseAccessService: courseAccessService,
+	}
 }
 
-// CreateCardRequest запрос на создание card
 type CreateCardRequest struct {
 	DeckID      int64   `json:"deck_id" binding:"required"`
 	Position    *int    `json:"position,omitempty"`
@@ -29,11 +43,10 @@ type CreateCardRequest struct {
 	AudioURL    *string `json:"audio_url,omitempty"`
 	ImageURL    *string `json:"image_url,omitempty"`
 	Example     *string `json:"example,omitempty"`
-	CreatedBy   *string `json:"created_by,omitempty"` // UUID в виде строки
+	CreatedBy   *string `json:"created_by,omitempty"`
 	IsCustom    bool    `json:"is_custom"`
 }
 
-// UpdateCardRequest запрос на обновление card
 type UpdateCardRequest struct {
 	Position    *int    `json:"position,omitempty"`
 	Word        string  `json:"word" binding:"required"`
@@ -54,24 +67,28 @@ type CreateCustomCardRequest struct {
 	Example     *string `json:"example,omitempty"`
 }
 
-// GetAllCards возвращает список всех cards или cards для конкретного deck
-// @Summary Получить все cards
-// @Description Возвращает список всех cards в системе или cards для конкретного deck (если указан deck_id)
-// @Tags cards
-// @Produce json
-// @Param deck_id query int false "Deck ID для фильтрации cards"
-// @Success 200 {array} models.Card
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /cards [get]
 func (h *CardHandler) GetAllCards(c *gin.Context) {
 	deckIDParam := c.Query("deck_id")
 
-	// Если указан deck_id, возвращаем cards для этого deck
 	if deckIDParam != "" {
 		deckID, err := strconv.ParseInt(deckIDParam, 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid deck_id format"})
+			return
+		}
+
+		deck, err := h.deckService.GetDeckByID(deckID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+
+		course, err := h.courseService.GetCourseByID(deck.CourseID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
+			return
+		}
+		if !ensureCourseAccess(c, h.courseAccessService, course) {
 			return
 		}
 
@@ -85,7 +102,11 @@ func (h *CardHandler) GetAllCards(c *gin.Context) {
 		return
 	}
 
-	// Иначе возвращаем все cards
+	if !isAdminRequest(c) {
+		c.JSON(http.StatusOK, []any{})
+		return
+	}
+
 	cards, err := h.cardService.GetAllCards()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -95,16 +116,6 @@ func (h *CardHandler) GetAllCards(c *gin.Context) {
 	c.JSON(http.StatusOK, cards)
 }
 
-// GetCardByID возвращает card по ID
-// @Summary Получить card по ID
-// @Description Возвращает информацию о card по его ID
-// @Tags cards
-// @Produce json
-// @Param id path int true "Card ID"
-// @Success 200 {object} models.Card
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Router /cards/{id} [get]
 func (h *CardHandler) GetCardByID(c *gin.Context) {
 	idParam := c.Param("id")
 	cardID, err := strconv.ParseInt(idParam, 10, 64)
@@ -119,20 +130,23 @@ func (h *CardHandler) GetCardByID(c *gin.Context) {
 		return
 	}
 
+	deck, err := h.deckService.GetDeckByID(card.DeckID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "deck not found"})
+		return
+	}
+	course, err := h.courseService.GetCourseByID(deck.CourseID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
+		return
+	}
+	if !ensureCourseAccess(c, h.courseAccessService, course) {
+		return
+	}
+
 	c.JSON(http.StatusOK, card)
 }
 
-// CreateCard создает новый card
-// @Summary Создать card
-// @Description Создает новый card в системе
-// @Tags cards
-// @Accept json
-// @Produce json
-// @Param card body CreateCardRequest true "Данные для создания card"
-// @Success 201 {object} models.Card
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /cards [post]
 func (h *CardHandler) CreateCard(c *gin.Context) {
 	var req CreateCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -140,7 +154,6 @@ func (h *CardHandler) CreateCard(c *gin.Context) {
 		return
 	}
 
-	// Логирование для отладки
 	if req.ImageURL != nil {
 		c.Header("X-Debug-ImageURL", *req.ImageURL)
 	}
@@ -148,20 +161,16 @@ func (h *CardHandler) CreateCard(c *gin.Context) {
 	var createdBy *uuid.UUID
 	if req.CreatedBy != nil && *req.CreatedBy != "" && *req.CreatedBy != "string" {
 		uuidVal, err := uuid.Parse(*req.CreatedBy)
-		if err != nil {
-			// Если не удалось распарсить UUID, просто игнорируем поле (не обязательное)
-			createdBy = nil
-		} else {
+		if err == nil {
 			createdBy = &uuidVal
 		}
 	}
 
-	// Нормализуем пустые строки в nil для опциональных полей
-	normalizeString := func(s *string) *string {
-		if s == nil || *s == "" || *s == "null" || *s == "string" {
+	normalizeString := func(value *string) *string {
+		if value == nil || *value == "" || *value == "null" || *value == "string" {
 			return nil
 		}
-		return s
+		return value
 	}
 
 	phonetic := normalizeString(req.Phonetic)
@@ -169,7 +178,6 @@ func (h *CardHandler) CreateCard(c *gin.Context) {
 	imageURL := normalizeString(req.ImageURL)
 	example := normalizeString(req.Example)
 
-	// Логирование для отладки
 	if imageURL != nil {
 		c.Header("X-Debug-ImageURL-Normalized", *imageURL)
 	}
@@ -180,7 +188,6 @@ func (h *CardHandler) CreateCard(c *gin.Context) {
 		return
 	}
 
-	// Логирование результата
 	if card.ImageURL != nil {
 		c.Header("X-Debug-ImageURL-Saved", *card.ImageURL)
 	}
@@ -246,19 +253,6 @@ func (h *CardHandler) CreateCustomCard(c *gin.Context) {
 	})
 }
 
-// UpdateCard обновляет card
-// @Summary Обновить card
-// @Description Обновляет информацию о card
-// @Tags cards
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Card ID"
-// @Param card body UpdateCardRequest true "Данные для обновления card"
-// @Success 200 {object} models.Card
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Router /admin/cards/{id} [put]
 func (h *CardHandler) UpdateCard(c *gin.Context) {
 	idParam := c.Param("id")
 	cardID, err := strconv.ParseInt(idParam, 10, 64)
@@ -273,20 +267,23 @@ func (h *CardHandler) UpdateCard(c *gin.Context) {
 		return
 	}
 
-	// Нормализуем пустые строки в nil для опциональных полей
-	normalizeString := func(s *string) *string {
-		if s == nil || *s == "" {
+	normalizeString := func(value *string) *string {
+		if value == nil || *value == "" {
 			return nil
 		}
-		return s
+		return value
 	}
 
-	phonetic := normalizeString(req.Phonetic)
-	audioURL := normalizeString(req.AudioURL)
-	imageURL := normalizeString(req.ImageURL)
-	example := normalizeString(req.Example)
-
-	card, err := h.cardService.UpdateCard(cardID, req.Position, req.Word, req.Translation, phonetic, audioURL, imageURL, example)
+	card, err := h.cardService.UpdateCard(
+		cardID,
+		req.Position,
+		req.Word,
+		req.Translation,
+		normalizeString(req.Phonetic),
+		normalizeString(req.AudioURL),
+		normalizeString(req.ImageURL),
+		normalizeString(req.Example),
+	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -295,17 +292,6 @@ func (h *CardHandler) UpdateCard(c *gin.Context) {
 	c.JSON(http.StatusOK, card)
 }
 
-// DeleteCard удаляет card
-// @Summary Удалить card
-// @Description Удаляет card из системы
-// @Tags cards
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Card ID"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Router /admin/cards/{id} [delete]
 func (h *CardHandler) DeleteCard(c *gin.Context) {
 	idParam := c.Param("id")
 	cardID, err := strconv.ParseInt(idParam, 10, 64)
@@ -314,8 +300,7 @@ func (h *CardHandler) DeleteCard(c *gin.Context) {
 		return
 	}
 
-	err = h.cardService.DeleteCard(cardID)
-	if err != nil {
+	if err := h.cardService.DeleteCard(cardID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}

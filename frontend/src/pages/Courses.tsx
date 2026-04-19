@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { config } from '../config'
 import { studyService, Course, UserCourse } from '../services/studyService'
 import { useAuthStore } from '../store/authStore'
-import { buildLatestUserCourseMap, getBlockingUserCourse, normalizeCourseProgress } from '../utils/courseProgress'
+import { buildLatestUserCourseMap, normalizeCourseProgress } from '../utils/courseProgress'
 
 function hasUsableAccessToken(token?: string | null) {
   if (!token) {
@@ -31,19 +31,16 @@ function hasUsableAccessToken(token?: string | null) {
 interface CourseCardProps {
   course: Course
   userCourse?: UserCourse
-  blockingCourse?: Course | null
-  isBlockingCourse: boolean
-  isLocked: boolean
 }
 
-function CourseCard({ course, userCourse, blockingCourse, isBlockingCourse, isLocked }: CourseCardProps) {
+function CourseCard({ course, userCourse }: CourseCardProps) {
   const progress = normalizeCourseProgress(userCourse?.progress_percentage)
-  const className = `overflow-hidden rounded-lg border bg-card-light shadow-md transition-all ${
-    isLocked ? 'cursor-not-allowed border-amber-200 opacity-80' : 'border-gray-200 hover:border-link-light hover:shadow-lg'
-  }`
 
-  const content = (
-    <>
+  return (
+    <Link
+      to={`/courses/${course.id}`}
+      className="overflow-hidden rounded-lg border border-gray-200 bg-card-light shadow-md transition-all hover:border-link-light hover:shadow-lg"
+    >
       {course.image_url && (
         <img
           src={config.getFullUrl(course.image_url)}
@@ -58,15 +55,13 @@ function CourseCard({ course, userCourse, blockingCourse, isBlockingCourse, isLo
       <div className="p-6">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-semibold text-text-light">{course.title}</h2>
-          {isBlockingCourse ? (
-            <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800">Текущий курс</span>
-          ) : progress >= 100 ? (
+          {progress >= 100 ? (
             <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">100% завершено</span>
-          ) : isLocked ? (
-            <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Заблокирован</span>
           ) : progress > 0 ? (
             <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">{progress}% пройдено</span>
-          ) : null}
+          ) : (
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Доступ открыт</span>
+          )}
         </div>
 
         {course.description && <p className="mb-4 line-clamp-2 text-sm text-text-light">{course.description}</p>}
@@ -79,36 +74,18 @@ function CourseCard({ course, userCourse, blockingCourse, isBlockingCourse, isLo
             </div>
             <div className="h-2 rounded-full bg-gray-200">
               <div
-                className={`h-2 rounded-full transition-all ${
-                  progress >= 100 ? 'bg-green-500' : isBlockingCourse ? 'bg-link-light' : 'bg-slate-400'
-                }`}
+                className={`h-2 rounded-full transition-all ${progress >= 100 ? 'bg-green-500' : 'bg-link-light'}`}
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
         )}
 
-        {isLocked && blockingCourse ? (
-          <p className="mb-4 text-sm text-amber-800">
-            Сначала завершите <span className="font-semibold">{blockingCourse.title}</span>.
-          </p>
-        ) : null}
-
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">{new Date(course.created_at).toLocaleDateString('ru-RU')}</span>
           <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Опубликован</span>
         </div>
       </div>
-    </>
-  )
-
-  if (isLocked) {
-    return <div className={className}>{content}</div>
-  }
-
-  return (
-    <Link to={`/courses/${course.id}`} className={className}>
-      {content}
     </Link>
   )
 }
@@ -120,13 +97,7 @@ export default function Courses() {
   const [loading, setLoading] = useState(true)
 
   const canUseProtectedStudyActions = Boolean(isAuthenticated && user?.id && hasUsableAccessToken(accessToken))
-
   const latestUserCourseMap = useMemo(() => buildLatestUserCourseMap(userCourses), [userCourses])
-  const blockingUserCourse = useMemo(() => getBlockingUserCourse(userCourses), [userCourses])
-  const blockingCourse = useMemo(
-    () => courses.find((course) => course.id === blockingUserCourse?.course_id) || null,
-    [courses, blockingUserCourse]
-  )
 
   useEffect(() => {
     void loadCourses()
@@ -160,36 +131,17 @@ export default function Courses() {
     <div>
       <h1 className="mb-6 text-3xl font-bold text-text-light">Курсы</h1>
 
-      {blockingUserCourse && blockingCourse && normalizeCourseProgress(blockingUserCourse.progress_percentage) < 100 && (
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-          Сначала завершите курс <span className="font-semibold">{blockingCourse.title}</span> на 100%.
-          Сейчас: {normalizeCourseProgress(blockingUserCourse.progress_percentage)}%.
-        </div>
-      )}
-
       {courses.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-card-light p-6 shadow-md">
-          <p className="text-center text-text-light">Курсов пока нет. Скоро здесь появятся новые курсы.</p>
+          <p className="text-center text-text-light">
+            Вам пока не выдан доступ ни к одному курсу. Обратитесь к администратору, чтобы открыть нужные курсы.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => {
-            const userCourse = latestUserCourseMap.get(course.id)
-            const progress = normalizeCourseProgress(userCourse?.progress_percentage)
-            const isBlockingCourse = blockingUserCourse?.course_id === course.id
-            const isLocked = Boolean(blockingUserCourse && !isBlockingCourse && progress < 100)
-
-            return (
-              <CourseCard
-                key={course.id}
-                course={course}
-                userCourse={userCourse}
-                blockingCourse={blockingCourse}
-                isBlockingCourse={Boolean(isBlockingCourse)}
-                isLocked={isLocked}
-              />
-            )
-          })}
+          {courses.map((course) => (
+            <CourseCard key={course.id} course={course} userCourse={latestUserCourseMap.get(course.id)} />
+          ))}
         </div>
       )}
     </div>

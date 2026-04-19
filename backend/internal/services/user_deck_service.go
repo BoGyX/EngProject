@@ -19,12 +19,12 @@ func NewUserDeckService(db *pgxpool.Pool) *UserDeckService {
 	return &UserDeckService{db: db}
 }
 
-// GetAllUserDecks возвращает все записи прогресса пользователей по декам
 func (s *UserDeckService) GetAllUserDecks() ([]models.UserDeck, error) {
 	rows, err := s.db.Query(context.Background(),
-		`SELECT id, user_id, deck_id, user_course_id, status, learned_cards_count, 
-		 total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at 
-		 FROM user_decks ORDER BY created_at DESC`,
+		`SELECT id, user_id, deck_id, user_course_id, status, learned_cards_count,
+		        total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at
+		 FROM user_decks
+		 ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -34,10 +34,9 @@ func (s *UserDeckService) GetAllUserDecks() ([]models.UserDeck, error) {
 	var userDecks []models.UserDeck
 	for rows.Next() {
 		var ud models.UserDeck
-		err := rows.Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
+		if err := rows.Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
 			&ud.LearnedCardsCount, &ud.TotalCardsCount, &ud.ProgressPercentage,
-			&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt)
-		if err != nil {
+			&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt); err != nil {
 			return nil, err
 		}
 		userDecks = append(userDecks, ud)
@@ -46,18 +45,17 @@ func (s *UserDeckService) GetAllUserDecks() ([]models.UserDeck, error) {
 	return userDecks, rows.Err()
 }
 
-// GetUserDeckByID возвращает прогресс по деку по ID
 func (s *UserDeckService) GetUserDeckByID(id int64) (*models.UserDeck, error) {
 	var ud models.UserDeck
 	err := s.db.QueryRow(context.Background(),
-		`SELECT id, user_id, deck_id, user_course_id, status, learned_cards_count, 
-		 total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at 
-		 FROM user_decks WHERE id = $1`,
+		`SELECT id, user_id, deck_id, user_course_id, status, learned_cards_count,
+		        total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at
+		 FROM user_decks
+		 WHERE id = $1`,
 		id,
 	).Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
 		&ud.LearnedCardsCount, &ud.TotalCardsCount, &ud.ProgressPercentage,
 		&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt)
-
 	if err != nil {
 		return nil, errors.New("user deck not found")
 	}
@@ -65,12 +63,17 @@ func (s *UserDeckService) GetUserDeckByID(id int64) (*models.UserDeck, error) {
 	return &ud, nil
 }
 
-// GetUserDecksByUserID возвращает все деки пользователя
 func (s *UserDeckService) GetUserDecksByUserID(userID uuid.UUID) ([]models.UserDeck, error) {
 	rows, err := s.db.Query(context.Background(),
-		`SELECT id, user_id, deck_id, user_course_id, status, learned_cards_count, 
-		 total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at 
-		 FROM user_decks WHERE user_id = $1 ORDER BY created_at DESC`,
+		`SELECT ud.id, ud.user_id, ud.deck_id, ud.user_course_id, ud.status, ud.learned_cards_count,
+		        ud.total_cards_count, ud.progress_percentage, ud.started_at, ud.last_opened_at, ud.completed_at, ud.is_active, ud.created_at, ud.updated_at
+		 FROM user_decks ud
+		 JOIN decks d ON d.id = ud.deck_id
+		 JOIN course_accesses ca
+		   ON ca.user_id = ud.user_id
+		  AND ca.course_id = d.course_id
+		 WHERE ud.user_id = $1
+		 ORDER BY ud.created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -81,10 +84,9 @@ func (s *UserDeckService) GetUserDecksByUserID(userID uuid.UUID) ([]models.UserD
 	var userDecks []models.UserDeck
 	for rows.Next() {
 		var ud models.UserDeck
-		err := rows.Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
+		if err := rows.Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
 			&ud.LearnedCardsCount, &ud.TotalCardsCount, &ud.ProgressPercentage,
-			&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt)
-		if err != nil {
+			&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt); err != nil {
 			return nil, err
 		}
 		userDecks = append(userDecks, ud)
@@ -93,31 +95,35 @@ func (s *UserDeckService) GetUserDecksByUserID(userID uuid.UUID) ([]models.UserD
 	return userDecks, rows.Err()
 }
 
-// StartDeck создает новую запись о начале деки пользователем
 func (s *UserDeckService) StartDeck(userID uuid.UUID, deckID int64, userCourseID *int64) (*models.UserDeck, error) {
-	// Получаем количество карточек в деку
+	ctx := context.Background()
+
+	var courseID int64
+	if err := s.db.QueryRow(ctx, "SELECT course_id FROM decks WHERE id = $1", deckID).Scan(&courseID); err != nil {
+		return nil, errors.New("deck not found")
+	}
+	if err := s.ensureCourseAccess(ctx, userID, courseID); err != nil {
+		return nil, err
+	}
+
 	var totalCards int
-	err := s.db.QueryRow(context.Background(),
-		"SELECT COUNT(*) FROM cards WHERE deck_id = $1",
-		deckID,
-	).Scan(&totalCards)
-	if err != nil {
+	if err := s.db.QueryRow(ctx, "SELECT COUNT(*) FROM cards WHERE deck_id = $1", deckID).Scan(&totalCards); err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
 	var ud models.UserDeck
-	err = s.db.QueryRow(context.Background(),
-		`INSERT INTO user_decks (user_id, deck_id, user_course_id, status, learned_cards_count, 
-		 total_cards_count, progress_percentage, started_at, last_opened_at, is_active, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		 RETURNING id, user_id, deck_id, user_course_id, status, learned_cards_count, 
-		 total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at`,
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO user_decks (
+			user_id, deck_id, user_course_id, status, learned_cards_count, total_cards_count,
+			progress_percentage, started_at, last_opened_at, is_active, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id, user_id, deck_id, user_course_id, status, learned_cards_count,
+		          total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at`,
 		userID, deckID, userCourseID, "in_progress", 0, totalCards, 0.0, &now, &now, false, now, now,
 	).Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
 		&ud.LearnedCardsCount, &ud.TotalCardsCount, &ud.ProgressPercentage,
 		&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -125,29 +131,30 @@ func (s *UserDeckService) StartDeck(userID uuid.UUID, deckID int64, userCourseID
 	return &ud, nil
 }
 
-// UpdateUserDeck обновляет прогресс пользователя по деку
 func (s *UserDeckService) UpdateUserDeck(id int64, status string, learnedCardsCount int, totalCardsCount int, progressPercentage float64) (*models.UserDeck, error) {
-	var ud models.UserDeck
 	var completedAt *time.Time
-
-	// Если статус completed, устанавливаем completed_at
 	if status == "completed" {
 		now := time.Now()
 		completedAt = &now
 	}
 
+	var ud models.UserDeck
 	err := s.db.QueryRow(context.Background(),
-		`UPDATE user_decks 
-		 SET status = $1, learned_cards_count = $2, total_cards_count = $3, 
-		 progress_percentage = $4, completed_at = $5, last_opened_at = NOW(), updated_at = $6
+		`UPDATE user_decks
+		 SET status = $1,
+		     learned_cards_count = $2,
+		     total_cards_count = $3,
+		     progress_percentage = $4,
+		     completed_at = $5,
+		     last_opened_at = NOW(),
+		     updated_at = $6
 		 WHERE id = $7
-		 RETURNING id, user_id, deck_id, user_course_id, status, learned_cards_count, 
-		 total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at`,
+		 RETURNING id, user_id, deck_id, user_course_id, status, learned_cards_count,
+		           total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at`,
 		status, learnedCardsCount, totalCardsCount, progressPercentage, completedAt, time.Now(), id,
 	).Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
 		&ud.LearnedCardsCount, &ud.TotalCardsCount, &ud.ProgressPercentage,
 		&ud.StartedAt, &ud.LastOpenedAt, &ud.CompletedAt, &ud.IsActive, &ud.CreatedAt, &ud.UpdatedAt)
-
 	if err != nil {
 		return nil, errors.New("user deck not found")
 	}
@@ -155,17 +162,14 @@ func (s *UserDeckService) UpdateUserDeck(id int64, status string, learnedCardsCo
 	return &ud, nil
 }
 
-// DeleteUserDeck удаляет запись о прогрессе по деку
 func (s *UserDeckService) DeleteUserDeck(id int64) error {
 	result, err := s.db.Exec(context.Background(),
 		"DELETE FROM user_decks WHERE id = $1",
 		id,
 	)
-
 	if err != nil {
 		return err
 	}
-
 	if result.RowsAffected() == 0 {
 		return errors.New("user deck not found")
 	}
@@ -176,11 +180,15 @@ func (s *UserDeckService) DeleteUserDeck(id int64) error {
 func (s *UserDeckService) GetActiveUserDeck(userID uuid.UUID) (*models.UserDeck, error) {
 	var ud models.UserDeck
 	err := s.db.QueryRow(context.Background(),
-		`SELECT id, user_id, deck_id, user_course_id, status, learned_cards_count,
-		        total_cards_count, progress_percentage, started_at, last_opened_at, completed_at, is_active, created_at, updated_at
-		 FROM user_decks
-		 WHERE user_id = $1 AND is_active = true
-		 ORDER BY last_opened_at DESC NULLS LAST, created_at DESC
+		`SELECT ud.id, ud.user_id, ud.deck_id, ud.user_course_id, ud.status, ud.learned_cards_count,
+		        ud.total_cards_count, ud.progress_percentage, ud.started_at, ud.last_opened_at, ud.completed_at, ud.is_active, ud.created_at, ud.updated_at
+		 FROM user_decks ud
+		 JOIN decks d ON d.id = ud.deck_id
+		 JOIN course_accesses ca
+		   ON ca.user_id = ud.user_id
+		  AND ca.course_id = d.course_id
+		 WHERE ud.user_id = $1 AND ud.is_active = true
+		 ORDER BY ud.last_opened_at DESC NULLS LAST, ud.created_at DESC
 		 LIMIT 1`,
 		userID,
 	).Scan(&ud.ID, &ud.UserID, &ud.DeckID, &ud.UserCourseID, &ud.Status,
@@ -205,10 +213,8 @@ func (s *UserDeckService) ActivateDeck(userID uuid.UUID, deckID int64) (*models.
 	if err := tx.QueryRow(ctx, "SELECT course_id FROM decks WHERE id = $1", deckID).Scan(&courseID); err != nil {
 		return nil, errors.New("deck not found")
 	}
-	if lockErr, err := findBlockingCourseProgress(ctx, tx, userID, courseID); err != nil {
+	if err := s.ensureCourseAccessTx(ctx, tx, userID, courseID); err != nil {
 		return nil, err
-	} else if lockErr != nil {
-		return nil, lockErr
 	}
 
 	var userCourseID int64
@@ -340,6 +346,44 @@ func (s *UserDeckService) ensureDeckUnlocked(ctx context.Context, tx pgx.Tx, use
 
 	if incompletePreviousDecks > 0 {
 		return errors.New("deck is locked until previous decks are completed")
+	}
+
+	return nil
+}
+
+func (s *UserDeckService) ensureCourseAccess(ctx context.Context, userID uuid.UUID, courseID int64) error {
+	var hasAccess bool
+	if err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM course_accesses
+			WHERE user_id = $1 AND course_id = $2
+		)`,
+		userID, courseID,
+	).Scan(&hasAccess); err != nil {
+		return err
+	}
+	if !hasAccess {
+		return errors.New("course access denied")
+	}
+
+	return nil
+}
+
+func (s *UserDeckService) ensureCourseAccessTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, courseID int64) error {
+	var hasAccess bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM course_accesses
+			WHERE user_id = $1 AND course_id = $2
+		)`,
+		userID, courseID,
+	).Scan(&hasAccess); err != nil {
+		return err
+	}
+	if !hasAccess {
+		return errors.New("course access denied")
 	}
 
 	return nil
