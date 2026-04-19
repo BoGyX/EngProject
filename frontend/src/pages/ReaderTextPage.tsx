@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { config } from '../config'
 import api from '../services/api'
 import { dictionaryService } from '../services/dictionaryService'
+import { PersonalTranslation, personalTranslationService } from '../services/personalTranslationService'
 import { Course, Deck, studyService } from '../services/studyService'
 
 interface ReadingText {
@@ -147,11 +148,16 @@ function pickPreferredVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoic
 export default function ReaderTextPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+
   const [text, setText] = useState<ReadingText | null>(null)
   const [loading, setLoading] = useState(true)
   const [wordTranslation, setWordTranslation] = useState<WordTranslation | null>(null)
+  const [personalTranslations, setPersonalTranslations] = useState<PersonalTranslation[]>([])
   const [loadingTranslation, setLoadingTranslation] = useState(false)
   const [addingWord, setAddingWord] = useState(false)
+  const [newPersonalTranslation, setNewPersonalTranslation] = useState('')
+  const [savingPersonalTranslation, setSavingPersonalTranslation] = useState(false)
+  const [personalTranslationMessage, setPersonalTranslationMessage] = useState<string | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isUploadedAudioPlaying, setIsUploadedAudioPlaying] = useState(false)
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
@@ -159,6 +165,7 @@ export default function ReaderTextPage() {
   const [readerMessage, setReaderMessage] = useState<string | null>(null)
   const [addedWords, setAddedWords] = useState<Set<string>>(new Set())
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
+
   const playbackTokenRef = useRef(0)
   const uploadedAudioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -167,12 +174,21 @@ export default function ReaderTextPage() {
   const uploadedAudioUrl = useMemo(() => (text?.audio_url ? config.getFullUrl(text.audio_url) : ''), [text?.audio_url])
   const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
   const preferredVoice = useMemo(() => pickPreferredVoice(availableVoices), [availableVoices])
+  const sortedPersonalTranslations = useMemo(
+    () =>
+      [...personalTranslations].sort((left, right) => {
+        const leftDate = new Date(left.created_at).getTime()
+        const rightDate = new Date(right.created_at).getTime()
+        return rightDate - leftDate
+      }),
+    [personalTranslations]
+  )
 
-  const getUserId = () => {
-    const authStorage = localStorage.getItem('auth-storage')
-    if (!authStorage) return null
-    const parsed = JSON.parse(authStorage)
-    return parsed?.state?.user?.id
+  const closeSelectedWord = () => {
+    setWordTranslation(null)
+    setPersonalTranslations([])
+    setNewPersonalTranslation('')
+    setPersonalTranslationMessage(null)
   }
 
   const stopTextPlayback = (updateState = true) => {
@@ -293,13 +309,12 @@ export default function ReaderTextPage() {
   const loadText = async () => {
     try {
       setLoading(true)
-      const userId = getUserId()
-      if (!userId || !id) {
+      if (!id) {
         navigate('/reader')
         return
       }
 
-      const response = await api.get<ReadingText>(`/reading-texts/${id}?user_id=${userId}`)
+      const response = await api.get<ReadingText>(`/reading-texts/${id}`)
       setText(response.data)
     } catch (error) {
       console.error('Error loading text:', error)
@@ -311,25 +326,50 @@ export default function ReaderTextPage() {
 
   const handleWordClick = async (value: string) => {
     const word = cleanWord(value)
-    if (!word) return
+    if (!word) {
+      return
+    }
 
     setReaderMessage(null)
+    setPersonalTranslationMessage(null)
+    setNewPersonalTranslation('')
 
     try {
       setLoadingTranslation(true)
-      const result = await dictionaryService.getWordInfo(word)
-      setWordTranslation({
-        word,
-        translation: result.translation || 'Перевод не найден',
-        phonetic: result.phonetic,
-        audio_url: result.audio_url,
-      })
+      const [dictionaryResult, personalResult] = await Promise.allSettled([
+        dictionaryService.getWordInfo(word),
+        personalTranslationService.getAll(word),
+      ])
+
+      if (personalResult.status === 'fulfilled') {
+        setPersonalTranslations(personalResult.value)
+      } else {
+        console.error('Error loading personal translations:', personalResult.reason)
+        setPersonalTranslations([])
+      }
+
+      if (dictionaryResult.status === 'fulfilled') {
+        const result = dictionaryResult.value
+        setWordTranslation({
+          word,
+          translation: result.translation || 'Перевод не найден',
+          phonetic: result.phonetic,
+          audio_url: result.audio_url,
+        })
+      } else {
+        console.error('Error translating word:', dictionaryResult.reason)
+        setWordTranslation({
+          word,
+          translation: 'Ошибка при получении перевода',
+        })
+      }
     } catch (error) {
       console.error('Error translating word:', error)
       setWordTranslation({
         word,
         translation: 'Ошибка при получении перевода',
       })
+      setPersonalTranslations([])
     } finally {
       setLoadingTranslation(false)
     }
@@ -490,6 +530,36 @@ export default function ReaderTextPage() {
     }
   }
 
+  const handleAddPersonalTranslation = async () => {
+    if (!wordTranslation || !newPersonalTranslation.trim()) {
+      return
+    }
+
+    try {
+      setSavingPersonalTranslation(true)
+      const created = await personalTranslationService.create(wordTranslation.word, newPersonalTranslation.trim())
+      setPersonalTranslations((current) => [created, ...current])
+      setNewPersonalTranslation('')
+      setPersonalTranslationMessage('Ваш перевод сохранён.')
+    } catch (error: any) {
+      console.error('Error saving personal translation:', error)
+      setPersonalTranslationMessage(error?.response?.data?.error || 'Не удалось сохранить перевод.')
+    } finally {
+      setSavingPersonalTranslation(false)
+    }
+  }
+
+  const handleDeletePersonalTranslation = async (translationId: number) => {
+    try {
+      await personalTranslationService.remove(translationId)
+      setPersonalTranslations((current) => current.filter((item) => item.id !== translationId))
+      setPersonalTranslationMessage('Перевод удалён.')
+    } catch (error: any) {
+      console.error('Error deleting personal translation:', error)
+      setPersonalTranslationMessage(error?.response?.data?.error || 'Не удалось удалить перевод.')
+    }
+  }
+
   const renderInteractiveText = (content: string) => {
     return content.split(/\n+/).map((line, lineIndex) => {
       const parts = line.split(/(\s+|[.,!?;:"'()[\]{}—-])/g)
@@ -602,7 +672,8 @@ export default function ReaderTextPage() {
         <div className="space-y-6">
           <div className="rounded-[28px] bg-white p-8 shadow-xl">
             <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-sm text-slate-600">
-              Нажимайте по словам, чтобы увидеть перевод, прослушать произношение и добавить слово в текущий активный дек.
+              Нажимайте по словам, чтобы увидеть перевод, прослушать произношение, добавить слово в текущий активный дек и
+              сохранить свой личный перевод, который виден только вам.
             </div>
             <div className="prose max-w-none text-lg leading-10 text-gray-800">{renderInteractiveText(normalizedContent)}</div>
           </div>
@@ -644,35 +715,6 @@ export default function ReaderTextPage() {
           </div>
 
           <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-text-light">Своя озвучка</h2>
-            {uploadedAudioUrl ? (
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-800">
-                  Для этого текста загружен собственный аудиофайл.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleToggleUploadedAudio()}
-                  className="w-full rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700"
-                >
-                  {isUploadedAudioPlaying ? 'Поставить на паузу' : 'Включить mp3'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleRestartUploadedAudio()}
-                  className="w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-                >
-                  Запустить сначала
-                </button>
-              </div>
-            ) : (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Для этого текста пока не загружена своя mp3-озвучка. Добавить ее можно при создании текста в reader.
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
             {loadingTranslation ? (
               <p className="text-center text-sm text-slate-500">Загрузка перевода...</p>
             ) : wordTranslation ? (
@@ -695,7 +737,7 @@ export default function ReaderTextPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setWordTranslation(null)}
+                      onClick={closeSelectedWord}
                       className="text-2xl text-slate-400 transition-colors hover:text-slate-600"
                     >
                       x
@@ -704,8 +746,60 @@ export default function ReaderTextPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Перевод</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Базовый перевод</p>
                   <p className="mt-2 text-lg font-medium text-slate-700">{wordTranslation.translation}</p>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Мои переводы</p>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      {personalTranslations.length}
+                    </span>
+                  </div>
+
+                  {sortedPersonalTranslations.length > 0 ? (
+                    <div className="space-y-2">
+                      {sortedPersonalTranslations.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-2"
+                        >
+                          <span className="text-sm font-medium text-slate-700">{item.translation}</span>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeletePersonalTranslation(item.id)}
+                            className="text-sm font-semibold text-red-500 transition-colors hover:text-red-700"
+                            title="Удалить перевод"
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Пока нет ваших личных переводов для этого слова.</p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newPersonalTranslation}
+                      onChange={(event) => setNewPersonalTranslation(event.target.value)}
+                      placeholder="Добавить свой перевод"
+                      className="min-w-0 flex-1 rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleAddPersonalTranslation()}
+                      disabled={savingPersonalTranslation || !newPersonalTranslation.trim()}
+                      className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {personalTranslationMessage && <p className="text-sm text-slate-500">{personalTranslationMessage}</p>}
                 </div>
 
                 {alreadyAdded && (
@@ -729,7 +823,8 @@ export default function ReaderTextPage() {
               </div>
             ) : (
               <div className="text-center text-sm text-slate-500">
-                Нажмите на слово в тексте, и здесь появятся перевод, произношение и кнопка добавления в словарь.
+                Нажмите на слово в тексте, и здесь появятся перевод, произношение, ваши личные переводы и кнопка
+                добавления в словарь.
               </div>
             )}
           </div>

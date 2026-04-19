@@ -52,6 +52,11 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to update course access schema: %w", err)
 	}
 
+	if err := ensurePersonalWordTranslationCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update personal translation schema: %w", err)
+	}
+
 	if err := ensureReadingTextCompatibility(pool); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to update reading_texts schema: %w", err)
@@ -316,5 +321,40 @@ ON CONFLICT (user_id, course_id) DO NOTHING;
 	}
 
 	log.Println("course_accesses schema is up to date")
+	return nil
+}
+
+func ensurePersonalWordTranslationCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking personal_word_translations schema...")
+
+	compatSQL := `
+CREATE TABLE IF NOT EXISTS personal_word_translations (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    word TEXT NOT NULL,
+    translation TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE personal_word_translations
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_personal_word_translations_user
+    ON personal_word_translations(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_personal_word_translations_user_word
+    ON personal_word_translations(user_id, word);
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("personal_word_translations schema is up to date")
 	return nil
 }

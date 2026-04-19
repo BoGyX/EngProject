@@ -123,6 +123,15 @@ CREATE TABLE personal_vocabulary (
 -- USER_COURSES (подписка на курс / общий прогресс)
 -- Содержит общий прогресс по курсу
 -- ===================================
+CREATE TABLE personal_word_translations (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    word TEXT NOT NULL,
+    translation TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- ===================================
 -- READING_TEXTS (reader texts)
 -- ===================================
@@ -290,6 +299,8 @@ CREATE INDEX idx_personal_vocabulary_word ON personal_vocabulary(word);
 -- Индекс для поиска по тегам (GIN индекс для массивов)
 CREATE INDEX idx_personal_vocabulary_tags ON personal_vocabulary USING GIN(tags);
 
+CREATE INDEX idx_personal_word_translations_user ON personal_word_translations(user_id);
+CREATE INDEX idx_personal_word_translations_user_word ON personal_word_translations(user_id, word);
 CREATE INDEX idx_reading_texts_user_id ON reading_texts(user_id);
 CREATE INDEX idx_reading_texts_course_id ON reading_texts(course_id);
 CREATE INDEX idx_user_courses_user ON user_courses(user_id);
@@ -333,6 +344,10 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER trg_personal_vocabulary_updated
 BEFORE UPDATE ON personal_vocabulary
+FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_personal_word_translations_updated
+BEFORE UPDATE ON personal_word_translations
 FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER trg_user_decks_updated

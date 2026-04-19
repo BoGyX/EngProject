@@ -18,7 +18,6 @@ func NewReadingTextHandler(textService *services.ReadingTextService) *ReadingTex
 }
 
 type CreateReadingTextRequest struct {
-	UserID   string `json:"user_id" binding:"required"`
 	CourseID int64  `json:"course_id" binding:"required"`
 	Title    string `json:"title" binding:"required"`
 	Content  string `json:"content" binding:"required"`
@@ -26,25 +25,23 @@ type CreateReadingTextRequest struct {
 }
 
 type UpdateReadingTextAudioRequest struct {
-	UserID   string `json:"user_id" binding:"required"`
 	AudioURL string `json:"audio_url" binding:"required"`
 }
 
-// GetAllReadingTexts возвращает все тексты пользователя
 func (h *ReadingTextHandler) GetAllReadingTexts(c *gin.Context) {
-	userIDParam := c.Query("user_id")
-	if userIDParam == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDParam)
+	userID, err := uuid.Parse(userIDValue.(string))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
 		return
 	}
 
-	texts, err := h.textService.GetAllByUserID(userID)
+	texts, err := h.textService.GetAllAccessible(userID, isAdminRequest(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -53,28 +50,26 @@ func (h *ReadingTextHandler) GetAllReadingTexts(c *gin.Context) {
 	c.JSON(http.StatusOK, texts)
 }
 
-// GetReadingTextByID возвращает текст по ID
 func (h *ReadingTextHandler) GetReadingTextByID(c *gin.Context) {
-	idParam := c.Param("id")
-	textID, err := strconv.ParseInt(idParam, 10, 64)
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not authenticated"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDValue.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	textID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid text ID format"})
 		return
 	}
 
-	userIDParam := c.Query("user_id")
-	if userIDParam == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDParam)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id format"})
-		return
-	}
-
-	text, err := h.textService.GetByID(textID, userID)
+	text, err := h.textService.GetAccessibleByID(textID, userID, isAdminRequest(c))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -83,20 +78,29 @@ func (h *ReadingTextHandler) GetReadingTextByID(c *gin.Context) {
 	c.JSON(http.StatusOK, text)
 }
 
-// CreateReadingText создает новый текст
 func (h *ReadingTextHandler) CreateReadingText(c *gin.Context) {
+	if !isAdminRequest(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can create reader texts"})
+		return
+	}
+
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not authenticated"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDValue.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
 	var req CreateReadingTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id format"})
-		return
-	}
-
 	if req.CourseID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "course_id is required"})
 		return
@@ -111,29 +115,19 @@ func (h *ReadingTextHandler) CreateReadingText(c *gin.Context) {
 	c.JSON(http.StatusCreated, text)
 }
 
-// DeleteReadingText удаляет текст
 func (h *ReadingTextHandler) DeleteReadingText(c *gin.Context) {
-	idParam := c.Param("id")
-	textID, err := strconv.ParseInt(idParam, 10, 64)
+	if !isAdminRequest(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can delete reader texts"})
+		return
+	}
+
+	textID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid text ID format"})
 		return
 	}
 
-	userIDParam := c.Query("user_id")
-	if userIDParam == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDParam)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id format"})
-		return
-	}
-
-	err = h.textService.Delete(textID, userID)
-	if err != nil {
+	if err := h.textService.Delete(textID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -142,8 +136,12 @@ func (h *ReadingTextHandler) DeleteReadingText(c *gin.Context) {
 }
 
 func (h *ReadingTextHandler) UpdateReadingTextAudio(c *gin.Context) {
-	idParam := c.Param("id")
-	textID, err := strconv.ParseInt(idParam, 10, 64)
+	if !isAdminRequest(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can update reader audio"})
+		return
+	}
+
+	textID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid text ID format"})
 		return
@@ -155,13 +153,7 @@ func (h *ReadingTextHandler) UpdateReadingTextAudio(c *gin.Context) {
 		return
 	}
 
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id format"})
-		return
-	}
-
-	text, err := h.textService.UpdateAudio(textID, userID, req.AudioURL)
+	text, err := h.textService.UpdateAudio(textID, req.AudioURL)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

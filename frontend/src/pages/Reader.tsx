@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { uploadService } from '../services/uploadService'
 import { Course, Deck, studyService } from '../services/studyService'
+import { useAuthStore } from '../store/authStore'
 
 interface ReadingText {
   id: number
@@ -21,6 +22,9 @@ const normalizeBreaks = (value: string) => value.replace(/<br\s*\/?>/gi, '\n')
 
 export default function Reader() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
+
   const [texts, setTexts] = useState<ReadingText[]>([])
   const [loading, setLoading] = useState(true)
   const [showUploadForm, setShowUploadForm] = useState(false)
@@ -34,16 +38,9 @@ export default function Reader() {
   const [availableCourses, setAvailableCourses] = useState<Course[]>([])
   const [selectedCourseId, setSelectedCourseId] = useState('')
 
-  const getUserId = () => {
-    const authStorage = localStorage.getItem('auth-storage')
-    if (!authStorage) return null
-    const parsed = JSON.parse(authStorage)
-    return parsed?.state?.user?.id
-  }
-
   useEffect(() => {
     void Promise.all([loadTexts(), loadActiveTarget(), loadCourses()])
-  }, [])
+  }, [user?.id])
 
   const loadCourses = async () => {
     try {
@@ -83,13 +80,11 @@ export default function Reader() {
   const loadTexts = async () => {
     try {
       setLoading(true)
-      const userId = getUserId()
-      if (!userId) return
-
-      const response = await api.get<ReadingText[]>(`/reading-texts?user_id=${userId}`)
+      const response = await api.get<ReadingText[]>('/reading-texts')
       setTexts(response.data || [])
     } catch (error) {
       console.error('Error loading texts:', error)
+      setTexts([])
     } finally {
       setLoading(false)
     }
@@ -123,6 +118,10 @@ export default function Reader() {
   }
 
   const handleToggleUploadForm = () => {
+    if (!isAdmin) {
+      return
+    }
+
     if (showUploadForm) {
       resetForm()
       return
@@ -133,6 +132,10 @@ export default function Reader() {
   }
 
   const handleSaveText = async () => {
+    if (!isAdmin) {
+      return
+    }
+
     if (!title.trim() || !content.trim()) {
       alert('Заполните название и текст')
       return
@@ -141,12 +144,6 @@ export default function Reader() {
     const courseId = Number(selectedCourseId)
     if (!courseId) {
       alert('Выберите курс для этого reader-текста')
-      return
-    }
-
-    const userId = getUserId()
-    if (!userId) {
-      alert('Пользователь не авторизован')
       return
     }
 
@@ -159,8 +156,7 @@ export default function Reader() {
         uploadedAudio = await uploadService.uploadAudio(audioFile)
       }
 
-      await api.post('/reading-texts', {
-        user_id: userId,
+      await api.post('/admin/reading-texts', {
         course_id: courseId,
         title: title.trim(),
         content: content.trim(),
@@ -184,13 +180,14 @@ export default function Reader() {
   }
 
   const handleDeleteText = async (textId: number) => {
+    if (!isAdmin) {
+      return
+    }
+
     if (!confirm('Удалить этот текст?')) return
 
-    const userId = getUserId()
-    if (!userId) return
-
     try {
-      await api.delete(`/reading-texts/${textId}?user_id=${userId}`)
+      await api.delete(`/admin/reading-texts/${textId}`)
       await loadTexts()
     } catch (error) {
       console.error('Error deleting text:', error)
@@ -230,16 +227,23 @@ export default function Reader() {
             <div>
               <h1 className="text-3xl font-bold text-text-light">Reader и тексты для курса</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Нажимайте на слова внутри текста: reader покажет перевод, произношение и позволит сразу
-                добавить слово в текущий активный дек.
+                Нажимайте на слова внутри текста: reader покажет перевод, произношение и даст добавить свои личные
+                переводы, которые видны только вам.
               </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 text-sm text-slate-600 shadow-sm">
+              {isAdmin ? (
+                <p>Тексты и mp3 в reader создаёт администратор. Пользователи видят только доступные им тексты по выданным курсам.</p>
+              ) : (
+                <p>Создавать и редактировать reader-тексты может только администратор. Вам доступны только тексты по назначенным курсам.</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 text-sm text-slate-600 shadow-sm">
               {activeDeck ? (
                 <p>
-                  Сейчас новые слова будут добавляться в дек{' '}
-                  <span className="font-semibold text-link-light">{activeDeck.title}</span>
+                  Сейчас новые слова будут добавляться в дек <span className="font-semibold text-link-light">{activeDeck.title}</span>
                   {activeCourse ? (
                     <>
                       {' '}
@@ -255,16 +259,18 @@ export default function Reader() {
             </div>
           </div>
 
-          <button
-            onClick={handleToggleUploadForm}
-            className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
-          >
-            {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleToggleUploadForm}
+              className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
+            >
+              {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
+            </button>
+          )}
         </div>
       </section>
 
-      {showUploadForm && (
+      {isAdmin && showUploadForm && (
         <section className="rounded-[28px] border border-rose-200 bg-white p-6 shadow-lg">
           <h2 className="text-xl font-bold text-text-light">Новый текст</h2>
           <p className="mt-2 text-sm text-slate-500">
@@ -286,10 +292,8 @@ export default function Reader() {
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-sm text-slate-500">
-                Выбранный курс нужен, чтобы текст и mp3 появлялись в админке в разделе "Подкасты".
-              </p>
             </div>
+
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">Загрузить из файла (.txt)</label>
               <input
@@ -350,8 +354,14 @@ export default function Reader() {
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {texts.length === 0 ? (
           <div className="col-span-full rounded-[28px] border border-gray-200 bg-card-light p-12 text-center shadow-md">
-            <p className="text-lg font-medium text-text-light">У вас пока нет текстов для reader.</p>
-            <p className="mt-2 text-sm text-slate-500">Добавьте первый текст и используйте его для словаря текущего курса.</p>
+            <p className="text-lg font-medium text-text-light">
+              {isAdmin ? 'В reader пока нет текстов.' : 'Для ваших курсов пока нет reader-текстов.'}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              {isAdmin
+                ? 'Добавьте первый текст и прикрепите к нему курс.'
+                : 'Когда администратор добавит тексты к вашим курсам, они появятся здесь.'}
+            </p>
           </div>
         ) : (
           texts.map((text) => (
@@ -390,16 +400,18 @@ export default function Reader() {
 
               <div className="flex items-center justify-between border-t border-gray-200 bg-slate-50 px-6 py-4">
                 <span className="text-sm font-semibold text-link-light transition-colors group-hover:text-link-dark">Открыть reader</span>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void handleDeleteText(text.id)
-                  }}
-                  className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                  title="Удалить текст"
-                >
-                  Удалить
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleDeleteText(text.id)
+                    }}
+                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                    title="Удалить текст"
+                  >
+                    Удалить
+                  </button>
+                )}
               </div>
             </article>
           ))

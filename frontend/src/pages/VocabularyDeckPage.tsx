@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { useAuthStore } from '../store/authStore'
+import { PersonalTranslation, personalTranslationService } from '../services/personalTranslationService'
 import { Card, Course, Deck, UserCard, UserDeck, studyService } from '../services/studyService'
+import { useAuthStore } from '../store/authStore'
 
 interface DeckSection {
   deck: Deck
@@ -13,11 +14,17 @@ interface CourseSection {
   decks: DeckSection[]
 }
 
+interface PersonalTranslationGroup {
+  word: string
+  items: PersonalTranslation[]
+}
+
 export default function VocabularyDeckPage() {
   const { user } = useAuthStore()
   const [sections, setSections] = useState<CourseSection[]>([])
   const [activeDeck, setActiveDeck] = useState<UserDeck | null>(null)
   const [legacyVocabulary, setLegacyVocabulary] = useState<any[]>([])
+  const [personalTranslations, setPersonalTranslations] = useState<PersonalTranslation[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set())
   const [selectedDeckId, setSelectedDeckId] = useState<number | null>(null)
@@ -35,9 +42,10 @@ export default function VocabularyDeckPage() {
     try {
       setLoading(true)
       const courses = await studyService.getCourses()
-      const [userCards, legacyWords] = await Promise.all([
+      const [userCards, legacyWords, savedPersonalTranslations] = await Promise.all([
         studyService.getUserCards(user.id),
         studyService.getLegacyVocabulary(user.id),
+        personalTranslationService.getAll(),
       ])
 
       try {
@@ -47,6 +55,7 @@ export default function VocabularyDeckPage() {
       }
 
       setLegacyVocabulary(legacyWords)
+      setPersonalTranslations(savedPersonalTranslations)
 
       const userCardMap = new Map<number, UserCard>(userCards.map((userCard) => [userCard.card_id, userCard]))
       const nextSections: CourseSection[] = []
@@ -75,6 +84,7 @@ export default function VocabularyDeckPage() {
     } catch (error) {
       console.error('Error loading vocabulary page:', error)
       setSections([])
+      setPersonalTranslations([])
     } finally {
       setLoading(false)
     }
@@ -110,6 +120,15 @@ export default function VocabularyDeckPage() {
     }
   }
 
+  const handleDeletePersonalTranslation = async (translationId: number) => {
+    try {
+      await personalTranslationService.remove(translationId)
+      setPersonalTranslations((current) => current.filter((item) => item.id !== translationId))
+    } catch (error) {
+      console.error('Error deleting personal translation:', error)
+    }
+  }
+
   const activeDeckTitle = useMemo(() => {
     if (!activeDeck) return 'не выбран'
 
@@ -119,6 +138,28 @@ export default function VocabularyDeckPage() {
         .find((section) => section.deck.id === activeDeck.deck_id)?.deck.title || 'не найден'
     )
   }, [activeDeck, sections])
+
+  const personalTranslationGroups = useMemo<PersonalTranslationGroup[]>(() => {
+    const groups = new Map<string, PersonalTranslation[]>()
+
+    for (const item of personalTranslations) {
+      const normalizedWord = item.word.trim().toLowerCase()
+      const existing = groups.get(normalizedWord) || []
+      existing.push(item)
+      groups.set(normalizedWord, existing)
+    }
+
+    return [...groups.entries()]
+      .map(([word, items]) => ({
+        word,
+        items: [...items].sort((left, right) => {
+          const leftDate = new Date(left.created_at).getTime()
+          const rightDate = new Date(right.created_at).getTime()
+          return rightDate - leftDate
+        }),
+      }))
+      .sort((left, right) => left.word.localeCompare(right.word, 'en'))
+  }, [personalTranslations])
 
   const summary = useMemo(() => {
     const totalCustomWords = sections.reduce(
@@ -134,8 +175,9 @@ export default function VocabularyDeckPage() {
       courses: sections.length,
       totalCustomWords,
       totalLearnedWords,
+      totalPersonalTranslations: personalTranslations.length,
     }
-  }, [sections])
+  }, [personalTranslations.length, sections])
 
   if (loading) {
     return <div className="py-8 text-center text-text-light">Загрузка словаря...</div>
@@ -158,12 +200,12 @@ export default function VocabularyDeckPage() {
             <div>
               <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Словарь пользователя</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Новые слова из reader и ручного словаря добавляются в текущий активный дек. Выученные и пользовательские слова
-                разложены по курсам и подкурсам отдельно.
+                Новые слова из reader и ручного словаря добавляются в текущий активный дек. Ваши личные переводы слов
+                хранятся отдельно и видны только вам.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Курсов со словарём</p>
                 <p className="mt-2 text-3xl font-bold text-text-light">{summary.courses}</p>
@@ -171,6 +213,10 @@ export default function VocabularyDeckPage() {
               <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Добавлено вами</p>
                 <p className="mt-2 text-3xl font-bold text-link-light">{summary.totalCustomWords}</p>
+              </div>
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Личных переводов</p>
+                <p className="mt-2 text-3xl font-bold text-emerald-700">{summary.totalPersonalTranslations}</p>
               </div>
               <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Выученных слов</p>
@@ -183,10 +229,74 @@ export default function VocabularyDeckPage() {
             <p className="text-xs uppercase tracking-[0.18em] text-rose-500">Активный дек сейчас</p>
             <p className="mt-3 text-2xl font-bold text-text-light">{activeDeckTitle}</p>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              Подкурс не закрывается после прохождения, но новые слова продолжают попадать именно в тот дек, который активен сейчас.
+              Подкурс не закрывается после прохождения, но новые слова продолжают попадать именно в тот дек, который
+              активен сейчас.
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-[28px] border border-emerald-200 bg-white p-6 shadow-md">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-text-light">Мои личные переводы</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Эти переводы вы добавляете сами в курсах и в reader. Они видны только вам и не меняют общий перевод
+              карточек.
+            </p>
+          </div>
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+            {personalTranslationGroups.length} слов
+          </span>
+        </div>
+
+        {personalTranslationGroups.length === 0 ? (
+          <div className="mt-5 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
+            Пока нет личных переводов. Добавьте их из reader или через всплывающее окно на странице курса.
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {personalTranslationGroups.map((group) => (
+              <article key={group.word} className="rounded-[24px] border border-emerald-200 bg-emerald-50/60 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-emerald-700">Слово</p>
+                    <h3 className="mt-2 text-2xl font-bold text-text-light">{group.word}</h3>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {group.items.length}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-light">{item.translation}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {new Date(item.created_at).toLocaleString('ru-RU', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeletePersonalTranslation(item.id)}
+                        className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 hover:text-red-700"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="space-y-5">
@@ -272,7 +382,8 @@ export default function VocabularyDeckPage() {
                             </form>
                           ) : (
                             <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-                              Этот подкурс можно пересматривать и после прохождения, но новые слова сейчас добавляются только в активный дек.
+                              Этот подкурс можно пересматривать и после прохождения, но новые слова сейчас добавляются
+                              только в активный дек.
                             </div>
                           )}
 
@@ -343,7 +454,8 @@ export default function VocabularyDeckPage() {
           <div>
             <h2 className="text-xl font-semibold text-text-light">Legacy personal_vocabulary</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Старый словарь оставлен только для чтения, чтобы можно было безопасно откатить изменения без потери данных.
+              Старый словарь оставлен только для чтения, чтобы можно было безопасно откатить изменения без потери
+              данных.
             </p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">

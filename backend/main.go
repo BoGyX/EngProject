@@ -164,6 +164,7 @@ func main() {
 	deckService := services.NewDeckService(db)
 	cardService := services.NewCardService(db)
 	vocabService := services.NewPersonalVocabularyService(db)
+	personalTranslationService := services.NewPersonalWordTranslationService(db)
 	userCourseService := services.NewUserCourseService(db)
 	userDeckService := services.NewUserDeckService(db)
 	userCardService := services.NewUserCardService(db)
@@ -222,6 +223,7 @@ func main() {
 	deckHandler := handlers.NewDeckHandler(deckService, courseService, courseAccessService)
 	cardHandler := handlers.NewCardHandler(cardService, userDeckService, deckService, courseService, courseAccessService)
 	vocabHandler := handlers.NewPersonalVocabularyHandler(vocabService)
+	personalTranslationHandler := handlers.NewPersonalWordTranslationHandler(personalTranslationService)
 	userCourseHandler := handlers.NewUserCourseHandler(userCourseService)
 	userDeckHandler := handlers.NewUserDeckHandler(userDeckService)
 	userCardHandler := handlers.NewUserCardHandler(userCardService)
@@ -337,16 +339,17 @@ func main() {
 		api.DELETE("/vocabulary/:id", vocabHandler.DeletePersonalVocabulary)
 
 		// Reading Texts endpoints
-		api.GET("/reading-texts", readingTextHandler.GetAllReadingTexts)
-		api.GET("/reading-texts/:id", readingTextHandler.GetReadingTextByID)
-		api.POST("/reading-texts", readingTextHandler.CreateReadingText)
-		api.PUT("/reading-texts/:id/audio", readingTextHandler.UpdateReadingTextAudio)
-		api.DELETE("/reading-texts/:id", readingTextHandler.DeleteReadingText)
 
 		// User Courses endpoints (прогресс пользователя по курсам)
 		authenticated := api.Group("")
 		authenticated.Use(middleware.Auth(cfg.JWT.Secret))
 		{
+			authenticated.GET("/reading-texts", readingTextHandler.GetAllReadingTexts)
+			authenticated.GET("/reading-texts/:id", readingTextHandler.GetReadingTextByID)
+			authenticated.GET("/personal-translations", personalTranslationHandler.GetPersonalTranslations)
+			authenticated.POST("/personal-translations", personalTranslationHandler.CreatePersonalTranslation)
+			authenticated.DELETE("/personal-translations/:id", personalTranslationHandler.DeletePersonalTranslation)
+
 			authenticated.GET("/user-courses/active", userCourseHandler.GetActiveUserCourse)
 			authenticated.POST("/user-courses/:course_id/activate", userCourseHandler.ActivateCourse)
 
@@ -434,6 +437,11 @@ func main() {
 
 			// Admin Podcasts
 			admin.GET("/podcasts", readingTextHandler.GetAdminPodcasts)
+
+			// Admin Reader
+			admin.POST("/reading-texts", readingTextHandler.CreateReadingText)
+			admin.PUT("/reading-texts/:id/audio", readingTextHandler.UpdateReadingTextAudio)
+			admin.DELETE("/reading-texts/:id", readingTextHandler.DeleteReadingText)
 		}
 	}
 
