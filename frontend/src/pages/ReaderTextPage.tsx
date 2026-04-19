@@ -5,7 +5,6 @@ import api from '../services/api'
 import { dictionaryService } from '../services/dictionaryService'
 import { PersonalTranslation, personalTranslationService } from '../services/personalTranslationService'
 import { Course, Deck, studyService } from '../services/studyService'
-import UserTranslationInput from '../components/UserTranslationInput'
 
 interface ReadingText {
   id: number
@@ -541,7 +540,7 @@ export default function ReaderTextPage() {
       const created = await personalTranslationService.create(wordTranslation.word, newPersonalTranslation.trim())
       setPersonalTranslations((current) => [created, ...current])
       setNewPersonalTranslation('')
-      setPersonalTranslationMessage('Ваш перевод сохранён.')
+      setPersonalTranslationMessage('Ваш перевод сохранен.')
     } catch (error: any) {
       console.error('Error saving personal translation:', error)
       setPersonalTranslationMessage(error?.response?.data?.error || 'Не удалось сохранить перевод.')
@@ -554,7 +553,7 @@ export default function ReaderTextPage() {
     try {
       await personalTranslationService.remove(translationId)
       setPersonalTranslations((current) => current.filter((item) => item.id !== translationId))
-      setPersonalTranslationMessage('Перевод удалён.')
+      setPersonalTranslationMessage('Перевод удален.')
     } catch (error: any) {
       console.error('Error deleting personal translation:', error)
       setPersonalTranslationMessage(error?.response?.data?.error || 'Не удалось удалить перевод.')
@@ -563,12 +562,12 @@ export default function ReaderTextPage() {
 
   const renderInteractiveText = (content: string) => {
     return content.split(/\n+/).map((line, lineIndex) => {
-      const parts = line.split(/(\s+|[.,!?;:"'()[\]{}—-])/g)
+      const parts = line.split(/(\s+|[.,!?;:"'()[\]{}-])/g)
       return (
         <p key={lineIndex} className="mb-4">
           {parts.map((part, partIndex) => {
             if (!part) return null
-            if (/^\s+$/.test(part) || /^[.,!?;:"'()[\]{}—-]$/.test(part)) {
+            if (/^\s+$/.test(part) || /^[.,!?;:"'()[\]{}-]$/.test(part)) {
               return <span key={partIndex}>{part}</span>
             }
 
@@ -751,7 +750,6 @@ export default function ReaderTextPage() {
                   <p className="mt-2 text-lg font-medium text-slate-700">{wordTranslation.translation}</p>
                 </div>
 
-<<<<<<< HEAD
                 <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Мои переводы</p>
@@ -803,9 +801,6 @@ export default function ReaderTextPage() {
 
                   {personalTranslationMessage && <p className="text-sm text-slate-500">{personalTranslationMessage}</p>}
                 </div>
-=======
-                <UserTranslationInput word={wordTranslation.word} autoTranslation={wordTranslation.translation} />
->>>>>>> 62b95baa7686992f42887702d041a3e3a8d881c4
 
                 {alreadyAdded && (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { ChangeEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { uploadService } from '../services/uploadService'
@@ -24,10 +24,7 @@ export default function Reader() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
-<<<<<<< HEAD
 
-=======
->>>>>>> 62b95baa7686992f42887702d041a3e3a8d881c4
   const [texts, setTexts] = useState<ReadingText[]>([])
   const [loading, setLoading] = useState(true)
   const [showUploadForm, setShowUploadForm] = useState(false)
@@ -93,7 +90,7 @@ export default function Reader() {
     }
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -106,7 +103,7 @@ export default function Reader() {
     reader.readAsText(file)
   }
 
-  const handleAudioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAudioFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     setAudioFile(file || null)
   }
@@ -187,7 +184,9 @@ export default function Reader() {
       return
     }
 
-    if (!confirm('Удалить этот текст?')) return
+    if (!window.confirm('Удалить этот текст?')) {
+      return
+    }
 
     try {
       await api.delete(`/admin/reading-texts/${textId}`)
@@ -263,21 +262,12 @@ export default function Reader() {
           </div>
 
           {isAdmin && (
-<<<<<<< HEAD
             <button
               onClick={handleToggleUploadForm}
               className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
             >
               {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
             </button>
-=======
-          <button
-            onClick={handleToggleUploadForm}
-            className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
-          >
-            {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
-          </button>
->>>>>>> 62b95baa7686992f42887702d041a3e3a8d881c4
           )}
         </div>
       </section>
@@ -413,7 +403,6 @@ export default function Reader() {
               <div className="flex items-center justify-between border-t border-gray-200 bg-slate-50 px-6 py-4">
                 <span className="text-sm font-semibold text-link-light transition-colors group-hover:text-link-dark">Открыть reader</span>
                 {isAdmin && (
-<<<<<<< HEAD
                   <button
                     onClick={(event) => {
                       event.stopPropagation()
@@ -424,18 +413,6 @@ export default function Reader() {
                   >
                     Удалить
                   </button>
-=======
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void handleDeleteText(text.id)
-                  }}
-                  className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                  title="Удалить текст"
-                >
-                  Удалить
-                </button>
->>>>>>> 62b95baa7686992f42887702d041a3e3a8d881c4
                 )}
               </div>
             </article>
