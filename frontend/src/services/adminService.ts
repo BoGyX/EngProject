@@ -67,10 +67,19 @@ export interface Podcast {
   course_id: number
   course_title: string
   course_slug: string
+  deck_id: number
+  deck_title: string
+  deck_slug: string
+  deck_position: number
   title: string
   audio_url: string
   created_at: string
   updated_at: string
+}
+
+export interface UserCourseAccess {
+  user_id: string
+  course_ids: number[]
 }
 
 export interface ImportCourseResponse {
@@ -130,6 +139,24 @@ export const adminService = {
 
   async publishCourse(id: number): Promise<Course> {
     const response = await api.post<Course>(`/admin/courses/${id}/publish`)
+    return response.data
+  },
+
+  // Users
+  async updateUserRole(userId: string, role: 'admin' | 'user') {
+    const response = await api.put(`/admin/users/${userId}/role`, { role })
+    return response.data
+  },
+
+  async getUserCourseAccess(userId: string): Promise<UserCourseAccess> {
+    const response = await api.get<UserCourseAccess>(`/admin/users/${userId}/course-access`)
+    return response.data
+  },
+
+  async updateUserCourseAccess(userId: string, courseIds: number[]): Promise<UserCourseAccess> {
+    const response = await api.put<UserCourseAccess>(`/admin/users/${userId}/course-access`, {
+      course_ids: courseIds,
+    })
     return response.data
   },
 

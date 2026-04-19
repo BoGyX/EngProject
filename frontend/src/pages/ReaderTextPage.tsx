@@ -5,6 +5,7 @@ import api from '../services/api'
 import { dictionaryService } from '../services/dictionaryService'
 import { PersonalTranslation, personalTranslationService } from '../services/personalTranslationService'
 import { Course, Deck, studyService } from '../services/studyService'
+import UserTranslationInput from '../components/UserTranslationInput'
 
 interface ReadingText {
   id: number
@@ -750,6 +751,7 @@ export default function ReaderTextPage() {
                   <p className="mt-2 text-lg font-medium text-slate-700">{wordTranslation.translation}</p>
                 </div>
 
+<<<<<<< HEAD
                 <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Мои переводы</p>
@@ -801,6 +803,9 @@ export default function ReaderTextPage() {
 
                   {personalTranslationMessage && <p className="text-sm text-slate-500">{personalTranslationMessage}</p>}
                 </div>
+=======
+                <UserTranslationInput word={wordTranslation.word} autoTranslation={wordTranslation.translation} />
+>>>>>>> 62b95baa7686992f42887702d041a3e3a8d881c4
 
                 {alreadyAdded && (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
