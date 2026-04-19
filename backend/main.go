@@ -403,7 +403,7 @@ func main() {
 		}
 
 		// Статические файлы для загруженных файлов
-		router.Static("/uploads", "./uploads")
+		router.Static("/uploads", uploadHandler.BaseDir())
 
 		// Admin endpoints (требуют авторизации и роль admin)
 		admin := api.Group("/admin")

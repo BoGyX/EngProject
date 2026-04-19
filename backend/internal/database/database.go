@@ -37,6 +37,16 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 
 	log.Printf("DB connection established")
 
+	if err := ensureCourseCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update courses schema: %w", err)
+	}
+
+	if err := ensureDeckCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update decks schema: %w", err)
+	}
+
 	if err := ensureCardCompatibility(pool); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to update cards schema: %w", err)
@@ -63,6 +73,139 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+func ensureCourseCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking courses schema...")
+
+	compatSQL := `
+CREATE TABLE IF NOT EXISTS courses (
+    id BIGSERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    slug TEXT,
+    description TEXT,
+    image_url TEXT,
+    is_published BOOLEAN DEFAULT false,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE courses
+    ADD COLUMN IF NOT EXISTS slug TEXT,
+    ADD COLUMN IF NOT EXISTS description TEXT,
+    ADD COLUMN IF NOT EXISTS image_url TEXT,
+    ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS created_by UUID,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+UPDATE courses
+SET slug = COALESCE(
+    NULLIF(REGEXP_REPLACE(LOWER(title), '[^a-z0-9]+', '-', 'g'), ''),
+    'course-' || id
+)
+WHERE slug IS NULL OR BTRIM(slug) = '';
+
+WITH ranked_courses AS (
+    SELECT id, slug, ROW_NUMBER() OVER (PARTITION BY slug ORDER BY id) AS rn
+    FROM courses
+)
+UPDATE courses c
+SET slug = c.slug || '-' || c.id
+FROM ranked_courses rc
+WHERE c.id = rc.id
+  AND rc.rn > 1;
+
+UPDATE courses
+SET is_published = false
+WHERE is_published IS NULL;
+
+UPDATE courses
+SET created_at = NOW()
+WHERE created_at IS NULL;
+
+ALTER TABLE courses
+    ALTER COLUMN slug SET NOT NULL,
+    ALTER COLUMN is_published SET DEFAULT false,
+    ALTER COLUMN created_at SET DEFAULT NOW();
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_slug_unique ON courses(slug);
+CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(is_published);
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("courses schema is up to date")
+	return nil
+}
+
+func ensureDeckCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking decks schema...")
+
+	compatSQL := `
+CREATE TABLE IF NOT EXISTS decks (
+    id BIGSERIAL PRIMARY KEY,
+    course_id BIGINT REFERENCES courses(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    slug TEXT,
+    description TEXT,
+    position INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE decks
+    ADD COLUMN IF NOT EXISTS slug TEXT,
+    ADD COLUMN IF NOT EXISTS description TEXT,
+    ADD COLUMN IF NOT EXISTS position INT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+UPDATE decks
+SET slug = COALESCE(
+    NULLIF(REGEXP_REPLACE(LOWER(title), '[^a-z0-9]+', '-', 'g'), ''),
+    'deck-' || id
+)
+WHERE slug IS NULL OR BTRIM(slug) = '';
+
+WITH ranked_decks AS (
+    SELECT id, course_id, slug, ROW_NUMBER() OVER (PARTITION BY course_id, slug ORDER BY id) AS rn
+    FROM decks
+)
+UPDATE decks d
+SET slug = d.slug || '-' || d.id
+FROM ranked_decks rd
+WHERE d.id = rd.id
+  AND rd.rn > 1;
+
+UPDATE decks
+SET position = 0
+WHERE position IS NULL;
+
+UPDATE decks
+SET created_at = NOW()
+WHERE created_at IS NULL;
+
+ALTER TABLE decks
+    ALTER COLUMN slug SET NOT NULL,
+    ALTER COLUMN position SET DEFAULT 0,
+    ALTER COLUMN created_at SET DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_decks_course ON decks(course_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_decks_course_slug_unique ON decks(course_id, slug);
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("decks schema is up to date")
+	return nil
 }
 
 func ensureCardCompatibility(pool *pgxpool.Pool) error {

@@ -67,7 +67,9 @@ func (s *CourseAccessService) GetAssignedCourseIDsByUserID(userID uuid.UUID) ([]
 
 func (s *CourseAccessService) GetAccessibleCoursesByUserID(userID uuid.UUID, includeUnpublished bool) ([]models.Course, error) {
 	rows, err := s.db.Query(context.Background(),
-		`SELECT c.id, c.title, c.slug, c.description, c.image_url, c.is_published, c.created_by, c.created_at
+		`SELECT c.id, c.title, c.slug, c.description, c.image_url, c.is_published,
+		        NULLIF(BTRIM(c.created_by::text), '') AS created_by,
+		        c.created_at
 		 FROM courses c
 		 JOIN course_accesses ca
 		   ON ca.course_id = c.id
@@ -83,11 +85,11 @@ func (s *CourseAccessService) GetAccessibleCoursesByUserID(userID uuid.UUID, inc
 
 	var courses []models.Course
 	for rows.Next() {
-		var course models.Course
-		if err := rows.Scan(&course.ID, &course.Title, &course.Slug, &course.Description, &course.ImageURL, &course.IsPublished, &course.CreatedBy, &course.CreatedAt); err != nil {
+		course, err := scanCourse(rows)
+		if err != nil {
 			return nil, err
 		}
-		courses = append(courses, course)
+		courses = append(courses, *course)
 	}
 
 	return courses, rows.Err()
