@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { adminService, Course } from '../services/adminService'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 
@@ -10,76 +11,117 @@ interface User {
   created_at: string
 }
 
-interface Course {
-  id: number
-  title: string
-  is_published: boolean
-}
-
-interface CourseAccess {
-  user_id: string
-  course_id: number
-  created_at: string
-}
-
 const USERS_PER_PAGE = 10
-
-function buildCourseAccessMap(accesses: CourseAccess[]) {
-  const accessMap = new Map<string, number[]>()
-
-  accesses.forEach((access) => {
-    const current = accessMap.get(access.user_id) || []
-    if (!current.includes(access.course_id)) {
-      current.push(access.course_id)
-    }
-    accessMap.set(access.user_id, current)
-  })
-
-  return accessMap
-}
 
 export default function AdminUsers() {
   const { user } = useAuthStore()
   const [users, setUsers] = useState<User[]>([])
-  const [courses, setCourses] = useState<Course[]>([])
-  const [accesses, setAccesses] = useState<CourseAccess[]>([])
   const [loading, setLoading] = useState(true)
-  const [busyUserId, setBusyUserId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCourseByUser, setSelectedCourseByUser] = useState<Record<string, string>>({})
+  const [availableCourses, setAvailableCourses] = useState<Course[]>([])
+  const [expandedAccessUserId, setExpandedAccessUserId] = useState<string | null>(null)
+  const [userCourseAccess, setUserCourseAccess] = useState<Record<string, number[]>>({})
+  const [loadingAccessUserId, setLoadingAccessUserId] = useState<string | null>(null)
+  const [savingRoleUserId, setSavingRoleUserId] = useState<string | null>(null)
+  const [savingAccessUserId, setSavingAccessUserId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user?.role !== 'admin') return
-    void loadData()
+    void loadUsersAndCourses()
   }, [user])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery])
 
-  const loadData = async () => {
+  const loadUsersAndCourses = async () => {
     try {
       setLoading(true)
-
-      const [usersResponse, coursesResponse, accessesResponse] = await Promise.all([
-        api.get<User[]>('/admin/users'),
-        api.get<Course[]>('/admin/courses'),
-        api.get<CourseAccess[]>('/admin/users/course-accesses'),
-      ])
-
-      setUsers(usersResponse.data || [])
-      setCourses(coursesResponse.data || [])
-      setAccesses(accessesResponse.data || [])
+      const [usersResponse, courses] = await Promise.all([api.get<User[]>('/users'), adminService.getAllCourses()])
+      setUsers(usersResponse.data)
+      setAvailableCourses(courses || [])
     } catch (error) {
-      console.error('Error loading admin users data:', error)
+      console.error('Error loading users:', error)
+      setAvailableCourses([])
     } finally {
       setLoading(false)
     }
   }
 
-  const courseById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses])
-  const courseAccessMap = useMemo(() => buildCourseAccessMap(accesses), [accesses])
+  const handleChangeRole = async (targetUserId: string, newRole: string) => {
+    if (!confirm(`Изменить роль пользователя на "${newRole}"?`)) return
+    try {
+      setSavingRoleUserId(targetUserId)
+      const updatedUser = await adminService.updateUserRole(targetUserId, newRole as 'admin' | 'user')
+      setUsers((current) => current.map((item) => (item.id === targetUserId ? { ...item, role: updatedUser.role } : item)))
+    } catch (error) {
+      console.error('Error changing role:', error)
+      alert('Не удалось изменить роль пользователя.')
+    } finally {
+      setSavingRoleUserId(null)
+    }
+  }
+
+  const loadUserCourseAccess = async (targetUserId: string) => {
+    try {
+      setLoadingAccessUserId(targetUserId)
+      const response = await adminService.getUserCourseAccess(targetUserId)
+      setUserCourseAccess((current) => ({
+        ...current,
+        [targetUserId]: response.course_ids || [],
+      }))
+    } catch (error) {
+      console.error('Error loading user course access:', error)
+      alert('Не удалось загрузить доступы к курсам.')
+    } finally {
+      setLoadingAccessUserId(null)
+    }
+  }
+
+  const toggleAccessEditor = async (targetUserId: string) => {
+    if (expandedAccessUserId === targetUserId) {
+      setExpandedAccessUserId(null)
+      return
+    }
+
+    setExpandedAccessUserId(targetUserId)
+    if (!(targetUserId in userCourseAccess)) {
+      await loadUserCourseAccess(targetUserId)
+    }
+  }
+
+  const handleToggleCourse = (targetUserId: string, courseId: number) => {
+    setUserCourseAccess((current) => {
+      const selected = new Set(current[targetUserId] || [])
+      if (selected.has(courseId)) {
+        selected.delete(courseId)
+      } else {
+        selected.add(courseId)
+      }
+
+      return {
+        ...current,
+        [targetUserId]: Array.from(selected),
+      }
+    })
+  }
+
+  const handleSaveCourseAccess = async (targetUserId: string) => {
+    try {
+      setSavingAccessUserId(targetUserId)
+      const response = await adminService.updateUserCourseAccess(targetUserId, userCourseAccess[targetUserId] || [])
+      setUserCourseAccess((current) => ({
+        ...current,
+        [targetUserId]: response.course_ids || [],
+      }))
+    } catch (error) {
+      console.error('Error saving user course access:', error)
+      alert('Не удалось сохранить доступ к курсам.')
+    } finally {
+      setSavingAccessUserId(null)
+    }
+  }
 
   const filteredUsers = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
@@ -92,67 +134,19 @@ export default function AdminUsers() {
     })
   }, [searchQuery, users])
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE))
+  const sortedCourses = useMemo(
+    () => [...availableCourses].sort((left, right) => left.title.localeCompare(right.title, 'ru-RU')),
+    [availableCourses]
+  )
+
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE)
   const startIndex = (currentPage - 1) * USERS_PER_PAGE
-  const currentUsers = filteredUsers.slice(startIndex, startIndex + USERS_PER_PAGE)
+  const endIndex = startIndex + USERS_PER_PAGE
+  const currentUsers = filteredUsers.slice(startIndex, endIndex)
 
   const goToPage = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleChangeRole = async (targetUserId: string, newRole: string) => {
-    if (!confirm(`Изменить роль пользователя на "${newRole}"?`)) {
-      return
-    }
-
-    try {
-      setBusyUserId(targetUserId)
-      await api.put(`/admin/users/${targetUserId}/role`, { role: newRole })
-      await loadData()
-    } catch (error) {
-      console.error('Error changing role:', error)
-      alert('Не удалось изменить роль пользователя')
-    } finally {
-      setBusyUserId(null)
-    }
-  }
-
-  const handleGrantCourseAccess = async (targetUserId: string) => {
-    const selectedCourseId = Number(selectedCourseByUser[targetUserId])
-    if (!selectedCourseId) {
-      alert('Сначала выберите курс')
-      return
-    }
-
-    try {
-      setBusyUserId(targetUserId)
-      await api.post(`/admin/users/${targetUserId}/course-accesses/${selectedCourseId}`)
-      setSelectedCourseByUser((current) => ({ ...current, [targetUserId]: '' }))
-      await loadData()
-    } catch (error) {
-      console.error('Error granting course access:', error)
-      alert('Не удалось выдать доступ к курсу')
-    } finally {
-      setBusyUserId(null)
-    }
-  }
-
-  const handleRevokeCourseAccess = async (targetUserId: string, courseId: number) => {
-    if (!confirm('Убрать доступ к этому курсу?')) {
-      return
-    }
-
-    try {
-      setBusyUserId(targetUserId)
-      await api.delete(`/admin/users/${targetUserId}/course-accesses/${courseId}`)
-      await loadData()
-    } catch (error) {
-      console.error('Error revoking course access:', error)
-      alert('Не удалось убрать доступ к курсу')
-    } finally {
-      setBusyUserId(null)
-    }
   }
 
   const renderPagination = () => {
@@ -187,7 +181,7 @@ export default function AdminUsers() {
       }
     }
 
-    for (let page = startPage; page <= endPage; page += 1) {
+    for (let page = startPage; page <= endPage; page++) {
       pages.push(
         <button
           key={page}
@@ -237,7 +231,7 @@ export default function AdminUsers() {
           disabled={currentPage === totalPages}
           className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-text-light transition-colors hover:border-rose-200 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Вперёд
+          Вперед
         </button>
       </div>
     )
@@ -261,14 +255,13 @@ export default function AdminUsers() {
                 Admin Users
               </span>
               <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
-                Роли и доступ к курсам
+                Поиск и роли
               </span>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Пользователи и права</h1>
+              <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Управление пользователями</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Здесь администратор управляет ролями пользователей и вручную выдаёт доступ к конкретным курсам. Новый пользователь
-                без назначений не увидит ни одного курса.
+                Здесь собраны все пользователи платформы. Можно быстро найти человека по имени или email и отследить текущую роль.
               </p>
             </div>
           </div>
@@ -276,10 +269,7 @@ export default function AdminUsers() {
           <div className="rounded-[24px] border border-rose-100 bg-white/80 p-6 shadow-lg">
             <p className="text-xs uppercase tracking-[0.18em] text-rose-500">Сводка</p>
             <p className="mt-3 text-3xl font-bold text-text-light">{users.length}</p>
-            <p className="mt-2 text-sm text-slate-600">
-              {searchQuery ? `Найдено по фильтру: ${filteredUsers.length}` : 'Всего пользователей в системе'}
-            </p>
-            <p className="mt-4 text-sm text-slate-600">Курсов для назначения: {courses.length}</p>
+            <p className="mt-2 text-sm text-slate-600">{searchQuery ? `Найдено по фильтру: ${filteredUsers.length}` : 'Всего пользователей в системе'}</p>
           </div>
         </div>
       </section>
@@ -298,6 +288,15 @@ export default function AdminUsers() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 transform text-slate-400 transition-colors hover:text-slate-600"
+              title="Очистить поиск"
+            >
+              ×
+            </button>
+          )}
         </div>
       </section>
 
@@ -307,149 +306,110 @@ export default function AdminUsers() {
             <p className="text-lg font-medium text-text-light">{searchQuery ? 'Пользователи не найдены.' : 'Пользователей пока нет.'}</p>
           </div>
         ) : (
-          currentUsers.map((item) => {
-            const assignedCourseIds = courseAccessMap.get(item.id) || []
-            const assignedCourses = assignedCourseIds
-              .map((courseId) => courseById.get(courseId))
-              .filter((course): course is Course => Boolean(course))
-              .sort((left, right) => left.title.localeCompare(right.title, 'ru'))
-            const availableCourses = courses
-              .filter((course) => !assignedCourseIds.includes(course.id))
-              .sort((left, right) => left.title.localeCompare(right.title, 'ru'))
-            const isBusy = busyUserId === item.id
-
-            return (
-              <article key={item.id} className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-semibold text-text-light">{item.name || 'Без имени'}</h2>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          item.role === 'admin' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {item.role === 'admin' ? 'Администратор' : 'Пользователь'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm text-slate-600">{item.email}</p>
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Регистрация: {new Date(item.created_at).toLocaleDateString('ru-RU')}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {item.role !== 'admin' && (
-                        <button
-                          onClick={() => void handleChangeRole(item.id, 'admin')}
-                          disabled={isBusy}
-                          className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Сделать админом
-                        </button>
-                      )}
-                      {item.role === 'admin' && item.id !== user?.id && (
-                        <button
-                          onClick={() => void handleChangeRole(item.id, 'user')}
-                          disabled={isBusy}
-                          className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Убрать админа
-                        </button>
-                      )}
-                    </div>
+          currentUsers.map((item) => (
+            <article key={item.id} className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-semibold text-text-light">{item.name || 'Без имени'}</h2>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        item.role === 'admin' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {item.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                    </span>
                   </div>
-
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-5">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-text-light">Доступ к курсам</h3>
-                        <p className="text-sm text-slate-500">
-                          {item.role === 'admin'
-                            ? 'Администратор видит все курсы без отдельных назначений.'
-                            : 'Назначайте только те курсы, которые должны появиться у пользователя.'}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                        {item.role === 'admin' ? 'Все курсы' : `${assignedCourses.length} назначено`}
-                      </span>
-                    </div>
-
-                    {item.role === 'admin' ? (
-                      <div className="rounded-2xl border border-rose-100 bg-white px-4 py-3 text-sm text-slate-600">
-                        Для администратора отдельные назначения не требуются.
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                          {assignedCourses.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
-                              Пока не выдан ни один курс.
-                            </div>
-                          ) : (
-                            assignedCourses.map((course) => (
-                              <div
-                                key={`${item.id}-${course.id}`}
-                                className="flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-2 text-sm text-text-light"
-                              >
-                                <span>{course.title}</span>
-                                {!course.is_published && (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                                    Черновик
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => void handleRevokeCourseAccess(item.id, course.id)}
-                                  disabled={isBusy}
-                                  className="text-sm font-semibold text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                  title="Убрать доступ"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        <div className="flex flex-col gap-3 sm:flex-row">
-                          <select
-                            value={selectedCourseByUser[item.id] || ''}
-                            onChange={(event) =>
-                              setSelectedCourseByUser((current) => ({
-                                ...current,
-                                [item.id]: event.target.value,
-                              }))
-                            }
-                            className="flex-1 rounded-2xl border border-gray-300 px-4 py-3 focus:border-link-light focus:outline-none"
-                          >
-                            <option value="">Выберите курс</option>
-                            {availableCourses.map((course) => (
-                              <option key={course.id} value={course.id}>
-                                {course.title}
-                                {course.is_published ? '' : ' (черновик)'}
-                              </option>
-                            ))}
-                          </select>
-
-                          <button
-                            type="button"
-                            onClick={() => void handleGrantCourseAccess(item.id)}
-                            disabled={isBusy || availableCourses.length === 0}
-                            className="rounded-2xl bg-link-light px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Выдать доступ
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-sm text-slate-600">{item.email}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    Регистрация: {new Date(item.created_at).toLocaleDateString('ru-RU')}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Доступно курсов: <span className="font-semibold text-text-light">{(userCourseAccess[item.id] || []).length}</span>
+                  </p>
                 </div>
-              </article>
-            )
-          })
+
+                <div className="flex flex-wrap gap-2">
+                  {item.role !== 'admin' && (
+                    <button
+                      onClick={() => handleChangeRole(item.id, 'admin')}
+                      disabled={savingRoleUserId === item.id}
+                      className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {savingRoleUserId === item.id ? 'Сохраняю...' : 'Сделать админом'}
+                    </button>
+                  )}
+                  {item.role === 'admin' && item.id !== user?.id && (
+                    <button
+                      onClick={() => handleChangeRole(item.id, 'user')}
+                      disabled={savingRoleUserId === item.id}
+                      className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {savingRoleUserId === item.id ? 'Сохраняю...' : 'Убрать админа'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => void toggleAccessEditor(item.id)}
+                    className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+                  >
+                    {expandedAccessUserId === item.id ? 'Скрыть курсы' : 'Доступ к курсам'}
+                  </button>
+                </div>
+              </div>
+
+              {expandedAccessUserId === item.id && (
+                <div className="mt-5 rounded-[24px] border border-rose-100 bg-rose-50/60 p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-text-light">Назначение курсов</h3>
+                      <p className="text-sm text-slate-600">Пользователь увидит только опубликованные курсы из этого списка.</p>
+                    </div>
+                    <button
+                      onClick={() => void handleSaveCourseAccess(item.id)}
+                      disabled={savingAccessUserId === item.id || loadingAccessUserId === item.id}
+                      className="rounded-2xl bg-link-light px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {savingAccessUserId === item.id ? 'Сохраняю...' : 'Сохранить доступ'}
+                    </button>
+                  </div>
+
+                  {loadingAccessUserId === item.id ? (
+                    <p className="mt-4 text-sm text-slate-500">Загрузка курсов...</p>
+                  ) : sortedCourses.length === 0 ? (
+                    <p className="mt-4 text-sm text-slate-500">Курсов пока нет.</p>
+                  ) : (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {sortedCourses.map((course) => {
+                        const selected = (userCourseAccess[item.id] || []).includes(course.id)
+
+                        return (
+                          <label
+                            key={course.id}
+                            className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+                              selected ? 'border-rose-200 bg-white' : 'border-slate-200 bg-white/80'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => handleToggleCourse(item.id, course.id)}
+                              className="mt-1 h-4 w-4 rounded border-slate-300 text-link-light focus:ring-link-light"
+                            />
+                            <div>
+                              <p className="font-semibold text-text-light">{course.title}</p>
+                              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
+                                {course.is_published ? 'Опубликован' : 'Черновик'}
+                              </p>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </article>
+          ))
         )}
       </section>
 
@@ -457,7 +417,7 @@ export default function AdminUsers() {
         {renderPagination()}
         {filteredUsers.length > 0 && (
           <p className="text-center text-sm text-slate-500">
-            Показано {startIndex + 1}-{Math.min(startIndex + USERS_PER_PAGE, filteredUsers.length)} из {filteredUsers.length} | Страница{' '}
+            Показано {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} из {filteredUsers.length} | Страница{' '}
             <strong>{currentPage}</strong> из <strong>{totalPages}</strong>
           </p>
         )}

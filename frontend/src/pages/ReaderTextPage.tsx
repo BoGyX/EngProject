@@ -4,6 +4,7 @@ import { config } from '../config'
 import api from '../services/api'
 import { dictionaryService } from '../services/dictionaryService'
 import { Course, Deck, studyService } from '../services/studyService'
+import UserTranslationInput from '../components/UserTranslationInput'
 
 interface ReadingText {
   id: number
@@ -707,6 +708,8 @@ export default function ReaderTextPage() {
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Перевод</p>
                   <p className="mt-2 text-lg font-medium text-slate-700">{wordTranslation.translation}</p>
                 </div>
+
+                <UserTranslationInput word={wordTranslation.word} autoTranslation={wordTranslation.translation} />
 
                 {alreadyAdded && (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">

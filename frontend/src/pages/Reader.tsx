@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { uploadService } from '../services/uploadService'
 import { Course, Deck, studyService } from '../services/studyService'
+import { useAuthStore } from '../store/authStore'
 
 interface ReadingText {
   id: number
@@ -21,6 +22,8 @@ const normalizeBreaks = (value: string) => value.replace(/<br\s*\/?>/gi, '\n')
 
 export default function Reader() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
   const [texts, setTexts] = useState<ReadingText[]>([])
   const [loading, setLoading] = useState(true)
   const [showUploadForm, setShowUploadForm] = useState(false)
@@ -255,16 +258,18 @@ export default function Reader() {
             </div>
           </div>
 
+          {isAdmin && (
           <button
             onClick={handleToggleUploadForm}
             className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
           >
             {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
           </button>
+          )}
         </div>
       </section>
 
-      {showUploadForm && (
+      {isAdmin && showUploadForm && (
         <section className="rounded-[28px] border border-rose-200 bg-white p-6 shadow-lg">
           <h2 className="text-xl font-bold text-text-light">Новый текст</h2>
           <p className="mt-2 text-sm text-slate-500">
@@ -390,6 +395,7 @@ export default function Reader() {
 
               <div className="flex items-center justify-between border-t border-gray-200 bg-slate-50 px-6 py-4">
                 <span className="text-sm font-semibold text-link-light transition-colors group-hover:text-link-dark">Открыть reader</span>
+                {isAdmin && (
                 <button
                   onClick={(event) => {
                     event.stopPropagation()
@@ -400,6 +406,7 @@ export default function Reader() {
                 >
                   Удалить
                 </button>
+                )}
               </div>
             </article>
           ))
