@@ -444,14 +444,14 @@ CREATE INDEX IF NOT EXISTS idx_course_accesses_user ON course_accesses(user_id);
 CREATE INDEX IF NOT EXISTS idx_course_accesses_course ON course_accesses(course_id);
 
 INSERT INTO course_accesses (user_id, course_id, granted_by)
-SELECT DISTINCT uc.user_id, uc.course_id, NULL
+SELECT DISTINCT uc.user_id, uc.course_id, NULL::UUID
 FROM user_courses uc
 WHERE uc.user_id IS NOT NULL
   AND uc.course_id IS NOT NULL
 ON CONFLICT (user_id, course_id) DO NOTHING;
 
 INSERT INTO course_accesses (user_id, course_id, granted_by)
-SELECT DISTINCT ud.user_id, d.course_id, NULL
+SELECT DISTINCT ud.user_id, d.course_id, NULL::UUID
 FROM user_decks ud
 JOIN decks d ON d.id = ud.deck_id
 WHERE ud.user_id IS NOT NULL
