@@ -68,11 +68,13 @@ func (s *UserDeckService) GetUserDecksByUserID(userID uuid.UUID) ([]models.UserD
 		`SELECT ud.id, ud.user_id, ud.deck_id, ud.user_course_id, ud.status, ud.learned_cards_count,
 		        ud.total_cards_count, ud.progress_percentage, ud.started_at, ud.last_opened_at, ud.completed_at, ud.is_active, ud.created_at, ud.updated_at
 		 FROM user_decks ud
+		 JOIN users u ON u.id = ud.user_id
 		 JOIN decks d ON d.id = ud.deck_id
-		 JOIN course_accesses ca
+		 LEFT JOIN course_accesses ca
 		   ON ca.user_id = ud.user_id
 		  AND ca.course_id = d.course_id
 		 WHERE ud.user_id = $1
+		   AND (u.role = 'admin' OR ca.user_id IS NOT NULL)
 		 ORDER BY ud.created_at DESC`,
 		userID,
 	)
@@ -183,11 +185,14 @@ func (s *UserDeckService) GetActiveUserDeck(userID uuid.UUID) (*models.UserDeck,
 		`SELECT ud.id, ud.user_id, ud.deck_id, ud.user_course_id, ud.status, ud.learned_cards_count,
 		        ud.total_cards_count, ud.progress_percentage, ud.started_at, ud.last_opened_at, ud.completed_at, ud.is_active, ud.created_at, ud.updated_at
 		 FROM user_decks ud
+		 JOIN users u ON u.id = ud.user_id
 		 JOIN decks d ON d.id = ud.deck_id
-		 JOIN course_accesses ca
+		 LEFT JOIN course_accesses ca
 		   ON ca.user_id = ud.user_id
 		  AND ca.course_id = d.course_id
-		 WHERE ud.user_id = $1 AND ud.is_active = true
+		 WHERE ud.user_id = $1
+		   AND ud.is_active = true
+		   AND (u.role = 'admin' OR ca.user_id IS NOT NULL)
 		 ORDER BY ud.last_opened_at DESC NULLS LAST, ud.created_at DESC
 		 LIMIT 1`,
 		userID,
@@ -356,8 +361,16 @@ func (s *UserDeckService) ensureCourseAccess(ctx context.Context, userID uuid.UU
 	if err := s.db.QueryRow(ctx,
 		`SELECT EXISTS(
 			SELECT 1
-			FROM course_accesses
-			WHERE user_id = $1 AND course_id = $2
+			FROM users u
+			WHERE u.id = $1
+			  AND (
+				u.role = 'admin'
+				OR EXISTS(
+					SELECT 1
+					FROM course_accesses
+					WHERE user_id = $1 AND course_id = $2
+				)
+			  )
 		)`,
 		userID, courseID,
 	).Scan(&hasAccess); err != nil {
@@ -375,8 +388,16 @@ func (s *UserDeckService) ensureCourseAccessTx(ctx context.Context, tx pgx.Tx, u
 	if err := tx.QueryRow(ctx,
 		`SELECT EXISTS(
 			SELECT 1
-			FROM course_accesses
-			WHERE user_id = $1 AND course_id = $2
+			FROM users u
+			WHERE u.id = $1
+			  AND (
+				u.role = 'admin'
+				OR EXISTS(
+					SELECT 1
+					FROM course_accesses
+					WHERE user_id = $1 AND course_id = $2
+				)
+			  )
 		)`,
 		userID, courseID,
 	).Scan(&hasAccess); err != nil {

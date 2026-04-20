@@ -67,9 +67,9 @@ export default function UserTranslationInput({ word, autoTranslation }: Props) {
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-500">Мой перевод</p>
 
       {saved && !editing ? (
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-base font-medium text-slate-700">{myTranslation}</p>
-          <div className="flex gap-2">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <p className="min-w-0 text-base font-medium text-slate-700">{myTranslation}</p>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -102,14 +102,14 @@ export default function UserTranslationInput({ word, autoTranslation }: Props) {
               </button>
             </p>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               type="text"
               value={myTranslation}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMyTranslation(e.target.value)}
               onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && void handleSave()}
               placeholder="Введите свой перевод..."
-              className="flex-1 rounded-xl border border-blue-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-blue-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
             />
             <button
               type="button"

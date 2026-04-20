@@ -100,8 +100,16 @@ func (s *CourseAccessService) UserHasAccess(userID uuid.UUID, courseID int64) (b
 	err := s.db.QueryRow(context.Background(),
 		`SELECT EXISTS(
 			SELECT 1
-			FROM course_accesses
-			WHERE user_id = $1 AND course_id = $2
+			FROM users u
+			WHERE u.id = $1
+			  AND (
+				u.role = 'admin'
+				OR EXISTS(
+					SELECT 1
+					FROM course_accesses
+					WHERE user_id = $1 AND course_id = $2
+				)
+			  )
 		)`,
 		userID, courseID,
 	).Scan(&hasAccess)

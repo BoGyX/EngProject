@@ -66,10 +66,13 @@ func (s *UserCourseService) GetUserCoursesByUserID(userID uuid.UUID) ([]models.U
 		`SELECT uc.id, uc.user_id, uc.course_id, uc.started_at, uc.last_opened_at, uc.completed_at, uc.is_active, uc.attempt_number,
 		        uc.completed_decks_count, uc.total_decks_count, uc.progress_percentage
 		 FROM user_courses uc
-		 JOIN course_accesses ca
+		 JOIN users u
+		   ON u.id = uc.user_id
+		 LEFT JOIN course_accesses ca
 		   ON ca.user_id = uc.user_id
 		  AND ca.course_id = uc.course_id
 		 WHERE uc.user_id = $1
+		   AND (u.role = 'admin' OR ca.user_id IS NOT NULL)
 		 ORDER BY uc.started_at DESC`,
 		userID,
 	)
@@ -196,10 +199,14 @@ func (s *UserCourseService) GetActiveUserCourse(userID uuid.UUID) (*models.UserC
 		`SELECT uc.id, uc.user_id, uc.course_id, uc.started_at, uc.last_opened_at, uc.completed_at, uc.is_active, uc.attempt_number,
 		        uc.completed_decks_count, uc.total_decks_count, uc.progress_percentage
 		 FROM user_courses uc
-		 JOIN course_accesses ca
+		 JOIN users u
+		   ON u.id = uc.user_id
+		 LEFT JOIN course_accesses ca
 		   ON ca.user_id = uc.user_id
 		  AND ca.course_id = uc.course_id
-		 WHERE uc.user_id = $1 AND uc.is_active = true
+		 WHERE uc.user_id = $1
+		   AND uc.is_active = true
+		   AND (u.role = 'admin' OR ca.user_id IS NOT NULL)
 		 ORDER BY uc.last_opened_at DESC NULLS LAST, uc.started_at DESC
 		 LIMIT 1`,
 		userID,
@@ -289,8 +296,16 @@ func (s *UserCourseService) ensureCourseAccess(ctx context.Context, userID uuid.
 	err := s.db.QueryRow(ctx,
 		`SELECT EXISTS(
 			SELECT 1
-			FROM course_accesses
-			WHERE user_id = $1 AND course_id = $2
+			FROM users u
+			WHERE u.id = $1
+			  AND (
+				u.role = 'admin'
+				OR EXISTS(
+					SELECT 1
+					FROM course_accesses
+					WHERE user_id = $1 AND course_id = $2
+				)
+			  )
 		)`,
 		userID, courseID,
 	).Scan(&hasAccess)
@@ -309,8 +324,16 @@ func (s *UserCourseService) ensureCourseAccessTx(ctx context.Context, tx pgx.Tx,
 	err := tx.QueryRow(ctx,
 		`SELECT EXISTS(
 			SELECT 1
-			FROM course_accesses
-			WHERE user_id = $1 AND course_id = $2
+			FROM users u
+			WHERE u.id = $1
+			  AND (
+				u.role = 'admin'
+				OR EXISTS(
+					SELECT 1
+					FROM course_accesses
+					WHERE user_id = $1 AND course_id = $2
+				)
+			  )
 		)`,
 		userID, courseID,
 	).Scan(&hasAccess)
