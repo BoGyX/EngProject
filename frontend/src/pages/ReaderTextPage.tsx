@@ -685,7 +685,7 @@ export default function ReaderTextPage() {
           )}
         </div>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
           <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-text-light">Куда добавится слово</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
