@@ -685,7 +685,7 @@ export default function ReaderTextPage() {
           )}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+        <aside className="space-y-4">
           <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-text-light">Куда добавится слово</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
@@ -714,7 +714,7 @@ export default function ReaderTextPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl">
+          <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-xl xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
             {loadingTranslation ? (
               <p className="text-center text-sm text-slate-500">Загрузка перевода...</p>
             ) : wordTranslation ? (
