@@ -13,6 +13,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const trainingSessionBatchSize = 10
+
 type trainingSessionQueueEntry struct {
 	CardID   int64
 	Mode     string
@@ -86,20 +88,11 @@ func (s *TrainingSessionService) GetTrainingSessionStateByID(id int64, userID *u
 		return nil, err
 	}
 
-	deckTranslations, err := s.getDeckTranslations(session.DeckID)
-	if err != nil {
-		return nil, err
-	}
-	fallbackTranslations, err := s.getFallbackTranslations(session.DeckID, 12)
-	if err != nil {
-		return nil, err
-	}
-
 	var currentCard *models.TrainingSessionCardState
 	remaining := 0
 	for index := range cards {
 		if cards[index].CurrentMode == "choice" && !cards[index].IsCompleted {
-			cards[index].Options = buildChoiceOptions(cards[index].Translation, cards, deckTranslations, fallbackTranslations)
+			cards[index].Options = buildChoiceOptions(cards[index].Translation, cards)
 		}
 		if !cards[index].IsCompleted {
 			remaining++
@@ -131,7 +124,7 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 	} else if openSessionID != 0 {
 		existingState, err := s.GetTrainingSessionStateByID(openSessionID, &userID)
 		if err == nil && existingState != nil {
-			if existingState.CurrentCard != nil {
+			if existingState.CurrentCard != nil && !sessionExceedsTrainingBatch(existingState.Cards, trainingSessionBatchSize) {
 				return existingState, nil
 			}
 			if _, finishErr := s.FinishTrainingSession(openSessionID); finishErr != nil {
@@ -466,6 +459,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 	rows, err := s.db.Query(context.Background(),
 		`SELECT
 			c.id,
+			COALESCE(c.position, 0),
 			c.is_custom,
 			c.image_url,
 			uc.id,
@@ -486,7 +480,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 		  AND uc.user_id = $1
 		  AND uc.user_deck_id = $2
 		 WHERE c.deck_id = $3
-		 ORDER BY c.id ASC`,
+		 ORDER BY c.position ASC, c.id ASC`,
 		userID, userDeck.ID, userDeck.DeckID,
 	)
 	if err != nil {
@@ -498,6 +492,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 	for rows.Next() {
 		var (
 			cardID          int64
+			cardPosition    int
 			isCustom        bool
 			imageURL        *string
 			userCardID      *int64
@@ -515,6 +510,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 		)
 		if err := rows.Scan(
 			&cardID,
+			&cardPosition,
 			&isCustom,
 			&imageURL,
 			&userCardID,
@@ -536,6 +532,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 		card := &models.Card{
 			ID:       cardID,
 			DeckID:   userDeck.DeckID,
+			Position: cardPosition,
 			IsCustom: isCustom,
 			ImageURL: imageURL,
 		}
@@ -582,7 +579,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 		return []trainingSessionQueueEntry{}, nil
 	}
 
-	shuffleTrainingCardPlans(cardPlans)
+	cardPlans = limitTrainingCardPlansToBatch(cardPlans, trainingSessionBatchSize)
 
 	maxRounds := 0
 	for _, plan := range cardPlans {
@@ -607,6 +604,32 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 	}
 
 	return queue, nil
+}
+
+func limitTrainingCardPlansToBatch(plans []trainingSessionCardPlan, batchSize int) []trainingSessionCardPlan {
+	if batchSize <= 0 || len(plans) <= batchSize {
+		return plans
+	}
+
+	limited := make([]trainingSessionCardPlan, batchSize)
+	copy(limited, plans[:batchSize])
+	return limited
+}
+
+func sessionExceedsTrainingBatch(cards []models.TrainingSessionCardState, batchSize int) bool {
+	if batchSize <= 0 {
+		return false
+	}
+
+	uniqueCardIDs := make(map[int64]struct{}, len(cards))
+	for _, card := range cards {
+		uniqueCardIDs[card.CardID] = struct{}{}
+		if len(uniqueCardIDs) > batchSize {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *TrainingSessionService) getFirstDeckIDByCourse(courseID int64) (int64, error) {
@@ -1045,7 +1068,7 @@ func matchesTrainingTranslation(answer string, translation string) bool {
 	return false
 }
 
-func buildChoiceOptions(correctTranslation string, sessionCards []models.TrainingSessionCardState, deckTranslations []string, fallbackTranslations []string) []string {
+func buildChoiceOptions(correctTranslation string, sessionCards []models.TrainingSessionCardState) []string {
 	seen := map[string]struct{}{normalizeTrainingText(correctTranslation): {}}
 	distractors := make([]string, 0, 4)
 
@@ -1063,18 +1086,6 @@ func buildChoiceOptions(correctTranslation string, sessionCards []models.Trainin
 
 	for _, card := range sessionCards {
 		appendDistinct(card.Translation)
-	}
-	for _, translation := range deckTranslations {
-		if len(distractors) >= 2 {
-			break
-		}
-		appendDistinct(translation)
-	}
-	for _, translation := range fallbackTranslations {
-		if len(distractors) >= 2 {
-			break
-		}
-		appendDistinct(translation)
 	}
 
 	shuffleStringValues(distractors)

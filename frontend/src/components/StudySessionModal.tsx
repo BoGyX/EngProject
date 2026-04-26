@@ -81,7 +81,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
     } catch (error) {
       console.error('Error starting training session:', error)
       setSession(null)
-      setErrorMessage(getErrorMessage(error, 'Не удалось запустить обучение. Попробуйте еще раз.'))
+      setErrorMessage(getErrorMessage(error, '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u0435. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.'))
     } finally {
       setLoading(false)
     }
@@ -101,14 +101,14 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
       setFeedback({
         correct: response.is_correct,
         text: response.is_correct
-          ? 'Верно. Переходим к следующему слову.'
-          : 'Ошибка. Идем к следующему слову; этот режим вернется уже в новой сессии.',
+          ? '\u0412\u0435\u0440\u043D\u043E. \u041F\u0435\u0440\u0435\u0445\u043E\u0434\u0438\u043C \u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C\u0443 \u0441\u043B\u043E\u0432\u0443.'
+          : '\u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442. \u041F\u0435\u0440\u0435\u0445\u043E\u0434\u0438\u043C \u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C\u0443 \u0441\u043B\u043E\u0432\u0443.',
       })
     } catch (error) {
       console.error('Error submitting training answer:', error)
       setFeedback({
         correct: false,
-        text: getErrorMessage(error, 'Не удалось проверить ответ. Попробуйте еще раз.'),
+        text: getErrorMessage(error, '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u043E\u0442\u0432\u0435\u0442. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.'),
       })
     } finally {
       setSubmitting(false)
