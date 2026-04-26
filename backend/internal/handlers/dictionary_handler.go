@@ -3,8 +3,6 @@ package handlers
 import (
 	"english-learning/internal/services"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,16 +29,7 @@ type GetWordInfoResponse struct {
 	Meanings    []string `json:"meanings,omitempty"`
 }
 
-func buildSuggestedImageURL(word string) string {
-	cleanedWord := strings.TrimSpace(strings.ToLower(word))
-	if cleanedWord == "" {
-		return ""
-	}
-
-	return "https://source.unsplash.com/featured/640x480/?" + url.QueryEscape(cleanedWord)
-}
-
-// GetWordInfo returns dictionary data plus a best-effort image suggestion for the admin card form.
+// GetWordInfo returns dictionary data for the admin card form.
 func (h *DictionaryHandler) GetWordInfo(c *gin.Context) {
 	word := c.Param("word")
 	if word == "" {
@@ -49,8 +38,7 @@ func (h *DictionaryHandler) GetWordInfo(c *gin.Context) {
 	}
 
 	response := GetWordInfoResponse{
-		Word:     word,
-		ImageURL: buildSuggestedImageURL(word),
+		Word: word,
 	}
 
 	translation, err := h.dictionaryService.TranslateToRussian(word)

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { config } from '../config'
 import FileUpload from '../components/FileUpload'
 import { adminService, Card, CreateDeckRequest, Deck } from '../services/adminService'
-import { dictionaryService, WordInfo } from '../services/dictionaryService'
+import { dictionaryService } from '../services/dictionaryService'
 import { useAuthStore } from '../store/authStore'
 import { slugify } from '../utils/slug'
 
@@ -46,8 +46,7 @@ export default function AdminDecks() {
   const [cardForm, setCardForm] = useState<CardEditorState>(emptyCardForm)
   const [slugTouched, setSlugTouched] = useState(false)
   const [searchingWord, setSearchingWord] = useState(false)
-  const [autoSuggestions, setAutoSuggestions] = useState(true)
-  const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const latestWordLookupRef = useRef(0)
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'admin' && courseId) {
@@ -55,14 +54,6 @@ export default function AdminDecks() {
       void loadDecks()
     }
   }, [courseId, isAuthenticated, user])
-
-  useEffect(() => {
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout)
-      }
-    }
-  }, [searchTimeout])
 
   const loadCourse = async () => {
     try {
@@ -130,6 +121,8 @@ export default function AdminDecks() {
   }
 
   const resetCardForm = () => {
+    latestWordLookupRef.current += 1
+    setSearchingWord(false)
     setCardForm(emptyCardForm)
     setEditingCard(null)
   }
@@ -178,45 +171,45 @@ export default function AdminDecks() {
     setShowDeckForm(true)
   }
 
-  const applyWordInfo = (info: WordInfo, overwrite: boolean) => {
-    setCardForm((current) => ({
-      word: info.word || current.word,
-      translation: overwrite || !current.translation ? info.translation || current.translation : current.translation,
-      audio_url: overwrite || !current.audio_url ? info.audio_url || current.audio_url : current.audio_url,
-      image_url: overwrite || !current.image_url ? info.image_url || current.image_url : current.image_url,
-    }))
-  }
-
   const handleSearchWord = async (wordToSearch?: string, overwrite = false) => {
     const normalizedWord = (wordToSearch || cardForm.word).trim().toLowerCase()
     if (normalizedWord.length < 2) {
       return
     }
 
+    const lookupId = latestWordLookupRef.current + 1
+    latestWordLookupRef.current = lookupId
+
     try {
       setSearchingWord(true)
       const info = await dictionaryService.getWordInfo(normalizedWord)
-      applyWordInfo(info, overwrite)
+
+      if (lookupId !== latestWordLookupRef.current) {
+        return
+      }
+
+      setCardForm((current) => {
+        if (current.word.trim().toLowerCase() !== normalizedWord) {
+          return current
+        }
+
+        return {
+          ...current,
+          translation: overwrite || !current.translation ? info.translation || current.translation : current.translation,
+          audio_url: overwrite || !current.audio_url ? info.audio_url || current.audio_url : current.audio_url,
+        }
+      })
     } catch (error) {
       console.error('Error searching word:', error)
     } finally {
-      setSearchingWord(false)
+      if (lookupId === latestWordLookupRef.current) {
+        setSearchingWord(false)
+      }
     }
   }
 
   const handleWordChange = (value: string) => {
     setCardForm((current) => ({ ...current, word: value }))
-
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
-    }
-
-    if (autoSuggestions && value.trim().length >= 2) {
-      const timeout = setTimeout(() => {
-        void handleSearchWord(value, false)
-      }, 700)
-      setSearchTimeout(timeout)
-    }
   }
 
   const getMediaUrl = (value?: string) => {
@@ -271,6 +264,8 @@ export default function AdminDecks() {
   }
 
   const handleEditCard = (card: Card) => {
+    latestWordLookupRef.current += 1
+    setSearchingWord(false)
     setEditingCard(card)
     setCardForm({
       word: card.word,
@@ -540,14 +535,6 @@ export default function AdminDecks() {
                     <h3 className="text-lg font-semibold text-text-light">
                       {editingCard ? 'Редактирование карточки' : 'Новая карточка'}
                     </h3>
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={autoSuggestions}
-                        onChange={(event) => setAutoSuggestions(event.target.checked)}
-                      />
-                      Автоподсказки
-                    </label>
                   </div>
 
                   <div className="flex gap-2">
@@ -575,7 +562,7 @@ export default function AdminDecks() {
                   </div>
 
                   <p className="text-xs leading-5 text-slate-500">
-                    По слову подтягиваем перевод, озвучку и картинку. Если нужен свой вариант, просто замените URL или загрузите файл.
+                    Кнопка API подтягивает только перевод и озвучку для текущего слова. Картинка автоматически больше не подставляется.
                   </p>
 
                   <input
@@ -616,7 +603,7 @@ export default function AdminDecks() {
                   <div className="rounded-[22px] border border-orange-100 bg-orange-50/70 p-4">
                     <div className="mb-3">
                       <div className="text-sm font-semibold text-text-light">Картинка</div>
-                      <p className="text-xs text-slate-500">Автоподбор подставляет внешний URL, но вы всегда можете загрузить своё изображение.</p>
+                      <p className="text-xs text-slate-500">Картинка добавляется только вручную: через файл или прямую ссылку.</p>
                     </div>
 
                     <FileUpload

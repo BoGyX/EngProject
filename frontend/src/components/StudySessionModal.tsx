@@ -53,7 +53,6 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
     }
 
     setTextAnswer('')
-    setFeedback(null)
 
     if (currentCard.current_mode === 'constructor') {
       setConstructorAnswer([])
