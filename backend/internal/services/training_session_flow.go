@@ -581,29 +581,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 
 	cardPlans = limitTrainingCardPlansToBatch(cardPlans, trainingSessionBatchSize)
 
-	maxRounds := 0
-	for _, plan := range cardPlans {
-		if len(plan.Modes) > maxRounds {
-			maxRounds = len(plan.Modes)
-		}
-	}
-
-	queue := make([]trainingSessionQueueEntry, 0)
-	for round := 0; round < maxRounds; round++ {
-		for _, plan := range cardPlans {
-			if round >= len(plan.Modes) {
-				continue
-			}
-
-			queue = append(queue, trainingSessionQueueEntry{
-				CardID:   plan.Card.ID,
-				Mode:     plan.Modes[round],
-				Progress: plan.Progress,
-			})
-		}
-	}
-
-	return queue, nil
+	return buildMixedTrainingQueue(cardPlans), nil
 }
 
 func limitTrainingCardPlansToBatch(plans []trainingSessionCardPlan, batchSize int) []trainingSessionCardPlan {
@@ -614,6 +592,70 @@ func limitTrainingCardPlansToBatch(plans []trainingSessionCardPlan, batchSize in
 	limited := make([]trainingSessionCardPlan, batchSize)
 	copy(limited, plans[:batchSize])
 	return limited
+}
+
+func buildMixedTrainingQueue(plans []trainingSessionCardPlan) []trainingSessionQueueEntry {
+	pending := make([]trainingSessionQueueEntry, 0)
+	for _, plan := range plans {
+		for _, mode := range plan.Modes {
+			pending = append(pending, trainingSessionQueueEntry{
+				CardID:   plan.Card.ID,
+				Mode:     mode,
+				Progress: plan.Progress,
+			})
+		}
+	}
+
+	if len(pending) <= 1 {
+		return pending
+	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	queue := make([]trainingSessionQueueEntry, 0, len(pending))
+	var previousCardID int64
+	var previousMode string
+	hasPreviousCard := false
+
+	for len(pending) > 0 {
+		candidateIndexes := make([]int, 0, len(pending))
+		for index, entry := range pending {
+			if hasPreviousCard && entry.CardID == previousCardID {
+				continue
+			}
+			if previousMode != "" && entry.Mode == previousMode {
+				continue
+			}
+			candidateIndexes = append(candidateIndexes, index)
+		}
+
+		if len(candidateIndexes) == 0 {
+			for index, entry := range pending {
+				if hasPreviousCard && entry.CardID == previousCardID {
+					continue
+				}
+				candidateIndexes = append(candidateIndexes, index)
+			}
+		}
+
+		if len(candidateIndexes) == 0 {
+			candidateIndexes = make([]int, 0, len(pending))
+			for index := range pending {
+				candidateIndexes = append(candidateIndexes, index)
+			}
+		}
+
+		chosenIndex := candidateIndexes[r.Intn(len(candidateIndexes))]
+		chosenEntry := pending[chosenIndex]
+		queue = append(queue, chosenEntry)
+
+		previousCardID = chosenEntry.CardID
+		previousMode = chosenEntry.Mode
+		hasPreviousCard = true
+
+		pending = append(pending[:chosenIndex], pending[chosenIndex+1:]...)
+	}
+
+	return queue
 }
 
 func sessionExceedsTrainingBatch(cards []models.TrainingSessionCardState, batchSize int) bool {
