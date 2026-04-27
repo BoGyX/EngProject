@@ -28,7 +28,7 @@ services:
     container_name: english_learning_api
     restart: unless-stopped
     working_dir: /app
-    command: ["go", "run", "."]
+    command: ["air", "-c", ".air.docker.toml"]
     ports:
       - "${API_PORT}:8000"
     environment:
@@ -58,6 +58,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      - ./backend/.air.docker.toml:/app/.air.docker.toml:ro
       - ./backend/uploads:/app/uploads
       - backend_go_mod_cache:/go/pkg/mod
       - backend_go_build_cache:/root/.cache/go-build

@@ -491,22 +491,22 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 	var cardPlans []trainingSessionCardPlan
 	for rows.Next() {
 		var (
-			cardID          int64
-			cardPosition    int
-			isCustom        bool
-			imageURL        *string
-			userCardID      *int64
-			status          string
-			correctCount    int
-			wrongCount      int
-			modeView        bool
-			modeChoice      bool
-			modeWithPhoto   bool
+			cardID           int64
+			cardPosition     int
+			isCustom         bool
+			imageURL         *string
+			userCardID       *int64
+			status           string
+			correctCount     int
+			wrongCount       int
+			modeView         bool
+			modeChoice       bool
+			modeWithPhoto    bool
 			modeWithoutPhoto bool
-			modeRussian     bool
-			modeConstructor bool
-			currentMode     string
-			progress        int
+			modeRussian      bool
+			modeConstructor  bool
+			currentMode      string
+			progress         int
 		)
 		if err := rows.Scan(
 			&cardID,
@@ -540,29 +540,25 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 		var userCard *models.UserCard
 		if userCardID != nil {
 			userCard = &models.UserCard{
-				ID:               *userCardID,
-				UserID:           userID,
-				CardID:           cardID,
-				UserDeckID:       &userDeck.ID,
-				Status:           status,
-				CorrectCount:     correctCount,
-				WrongCount:       wrongCount,
-				ModeView:         modeView,
-				ModeChoice:       modeChoice,
-				ModeWithPhoto:    modeWithPhoto,
-				ModeWithoutPhoto: modeWithoutPhoto,
-				ModeRussian:      modeRussian,
-				ModeConstructor:  modeConstructor,
-				CurrentMode:      currentMode,
+				ID:                 *userCardID,
+				UserID:             userID,
+				CardID:             cardID,
+				UserDeckID:         &userDeck.ID,
+				Status:             status,
+				CorrectCount:       correctCount,
+				WrongCount:         wrongCount,
+				ModeView:           modeView,
+				ModeChoice:         modeChoice,
+				ModeWithPhoto:      modeWithPhoto,
+				ModeWithoutPhoto:   modeWithoutPhoto,
+				ModeRussian:        modeRussian,
+				ModeConstructor:    modeConstructor,
+				CurrentMode:        currentMode,
 				ProgressPercentage: progress,
 			}
 		}
 
 		modes := getUnfinishedTrainingModes(userCard, card)
-		if len(modes) == 0 {
-			continue
-		}
-
 		cardPlans = append(cardPlans, trainingSessionCardPlan{
 			Card:     card,
 			UserCard: userCard,
@@ -579,19 +575,45 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 		return []trainingSessionQueueEntry{}, nil
 	}
 
-	cardPlans = limitTrainingCardPlansToBatch(cardPlans, trainingSessionBatchSize)
+	cardPlans = selectTrainingCardPlansForActiveBatch(cardPlans, trainingSessionBatchSize)
 
 	return buildMixedTrainingQueue(cardPlans), nil
 }
 
-func limitTrainingCardPlansToBatch(plans []trainingSessionCardPlan, batchSize int) []trainingSessionCardPlan {
-	if batchSize <= 0 || len(plans) <= batchSize {
-		return plans
+func selectTrainingCardPlansForActiveBatch(plans []trainingSessionCardPlan, batchSize int) []trainingSessionCardPlan {
+	if len(plans) == 0 {
+		return []trainingSessionCardPlan{}
 	}
 
-	limited := make([]trainingSessionCardPlan, batchSize)
-	copy(limited, plans[:batchSize])
-	return limited
+	if batchSize <= 0 {
+		return filterUnfinishedTrainingCardPlans(plans)
+	}
+
+	for start := 0; start < len(plans); start += batchSize {
+		end := start + batchSize
+		if end > len(plans) {
+			end = len(plans)
+		}
+
+		batchPlans := filterUnfinishedTrainingCardPlans(plans[start:end])
+		if len(batchPlans) > 0 {
+			return batchPlans
+		}
+	}
+
+	return []trainingSessionCardPlan{}
+}
+
+func filterUnfinishedTrainingCardPlans(plans []trainingSessionCardPlan) []trainingSessionCardPlan {
+	filtered := make([]trainingSessionCardPlan, 0, len(plans))
+	for _, plan := range plans {
+		if len(plan.Modes) == 0 {
+			continue
+		}
+		filtered = append(filtered, plan)
+	}
+
+	return filtered
 }
 
 func buildMixedTrainingQueue(plans []trainingSessionCardPlan) []trainingSessionQueueEntry {
