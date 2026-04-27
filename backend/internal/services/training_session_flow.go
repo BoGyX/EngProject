@@ -577,7 +577,7 @@ func (s *TrainingSessionService) buildScopedTrainingQueue(userID uuid.UUID, user
 
 	cardPlans = selectTrainingCardPlansForActiveBatch(cardPlans, trainingSessionBatchSize)
 
-	return buildMixedTrainingQueue(cardPlans), nil
+	return buildTrainingQueueForBatch(cardPlans), nil
 }
 
 func selectTrainingCardPlansForActiveBatch(plans []trainingSessionCardPlan, batchSize int) []trainingSessionCardPlan {
@@ -616,7 +616,58 @@ func filterUnfinishedTrainingCardPlans(plans []trainingSessionCardPlan) []traini
 	return filtered
 }
 
-func buildMixedTrainingQueue(plans []trainingSessionCardPlan) []trainingSessionQueueEntry {
+func buildTrainingQueueForBatch(plans []trainingSessionCardPlan) []trainingSessionQueueEntry {
+	if len(plans) == 0 {
+		return []trainingSessionQueueEntry{}
+	}
+
+	studyQueue := make([]trainingSessionQueueEntry, 0, len(plans))
+	practicePlans := make([]trainingSessionCardPlan, 0, len(plans))
+
+	for _, plan := range plans {
+		studyModes, practiceModes := splitTrainingModes(plan.Modes)
+
+		for _, mode := range studyModes {
+			studyQueue = append(studyQueue, trainingSessionQueueEntry{
+				CardID:   plan.Card.ID,
+				Mode:     mode,
+				Progress: plan.Progress,
+			})
+		}
+
+		if len(practiceModes) == 0 {
+			continue
+		}
+
+		practicePlans = append(practicePlans, trainingSessionCardPlan{
+			Card:     plan.Card,
+			UserCard: plan.UserCard,
+			Modes:    practiceModes,
+			Progress: plan.Progress,
+		})
+	}
+
+	practiceQueue := buildMixedPracticeQueue(practicePlans)
+	return append(studyQueue, practiceQueue...)
+}
+
+func splitTrainingModes(modes []string) ([]string, []string) {
+	studyModes := make([]string, 0, 1)
+	practiceModes := make([]string, 0, len(modes))
+
+	for _, mode := range modes {
+		if mode == "view" {
+			studyModes = append(studyModes, mode)
+			continue
+		}
+
+		practiceModes = append(practiceModes, mode)
+	}
+
+	return studyModes, practiceModes
+}
+
+func buildMixedPracticeQueue(plans []trainingSessionCardPlan) []trainingSessionQueueEntry {
 	pending := make([]trainingSessionQueueEntry, 0)
 	for _, plan := range plans {
 		for _, mode := range plan.Modes {
