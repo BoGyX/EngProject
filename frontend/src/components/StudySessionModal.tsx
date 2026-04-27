@@ -397,7 +397,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4">
+              <div className="hidden flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-400">
                     Шаг {currentCard.sequence_number} из {session.cards.length}

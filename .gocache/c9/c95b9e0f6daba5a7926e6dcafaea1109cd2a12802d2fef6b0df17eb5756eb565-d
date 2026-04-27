@@ -1,0 +1,13 @@
+./card.go
+./course.go
+./course_access.go
+./deck.go
+./personal_vocabulary.go
+./personal_word_translation.go
+./reading_text.go
+./refresh_token.go
+./training_session.go
+./user.go
+./user_card.go
+./user_course.go
+./user_deck.go

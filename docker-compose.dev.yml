@@ -1,7 +1,9 @@
+name: engproject-dev
+
 services:
   db:
     image: postgres:15-alpine
-    container_name: english_learning_db
+    container_name: english_learning_db_dev
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -21,14 +23,15 @@ services:
       retries: 5
 
   backend:
+    image: engproject-backend-dev
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: dev
-    container_name: english_learning_api
+    container_name: english_learning_api_dev
     restart: unless-stopped
     working_dir: /app
-    command: ["air", "-c", ".air.docker.toml"]
+    command: ["go", "run", "."]
     ports:
       - "${API_PORT}:8000"
     environment:
@@ -58,7 +61,6 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
-      - ./backend/.air.docker.toml:/app/.air.docker.toml:ro
       - ./backend/uploads:/app/uploads
       - backend_go_mod_cache:/go/pkg/mod
       - backend_go_build_cache:/root/.cache/go-build
@@ -66,11 +68,12 @@ services:
       - english_learning_network
 
   frontend:
+    image: engproject-frontend-dev
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: dev
-    container_name: english_learning_frontend
+    container_name: english_learning_frontend_dev
     restart: unless-stopped
     working_dir: /app
     command:
@@ -99,7 +102,7 @@ services:
 
   adminer:
     image: adminer:latest
-    container_name: english_learning_adminer
+    container_name: english_learning_adminer_dev
     restart: unless-stopped
     ports:
       - "${ADMINER_PORT}:8080"

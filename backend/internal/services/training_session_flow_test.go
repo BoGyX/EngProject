@@ -2,6 +2,7 @@ package services
 
 import (
 	"english-learning/internal/models"
+	"fmt"
 	"testing"
 )
 
@@ -59,10 +60,57 @@ func TestSelectTrainingCardPlansForActiveBatchMovesToNextBatchAfterFirstIsComple
 	}
 }
 
+func TestBuildTrainingQueueForBatchKeepsChaosWithinSelectedWords(t *testing.T) {
+	plans := []trainingSessionCardPlan{
+		{
+			Card:     trainingCardPlanStub{ID: 1}.toModel(),
+			Modes:    []string{"view", "choice", "constructor"},
+			Progress: 0,
+		},
+		{
+			Card:     trainingCardPlanStub{ID: 2}.toModel(),
+			Modes:    []string{"view", "choice", "constructor"},
+			Progress: 0,
+		},
+	}
+
+	queue := buildTrainingQueueForBatch(plans)
+	if len(queue) != 6 {
+		t.Fatalf("expected 6 queue entries, got %d", len(queue))
+	}
+
+	expectedPairs := map[string]int{
+		"1:view":        1,
+		"1:choice":      1,
+		"1:constructor": 1,
+		"2:view":        1,
+		"2:choice":      1,
+		"2:constructor": 1,
+	}
+
+	for _, entry := range queue {
+		key := trainingQueuePairKey(entry.CardID, entry.Mode)
+		if expectedPairs[key] == 0 {
+			t.Fatalf("unexpected queue entry %s", key)
+		}
+		expectedPairs[key]--
+	}
+
+	for key, remaining := range expectedPairs {
+		if remaining != 0 {
+			t.Fatalf("expected queue entry %s to appear exactly once, remaining=%d", key, remaining)
+		}
+	}
+}
+
 type trainingCardPlanStub struct {
 	ID int64
 }
 
 func (s trainingCardPlanStub) toModel() *models.Card {
 	return &models.Card{ID: s.ID}
+}
+
+func trainingQueuePairKey(cardID int64, mode string) string {
+	return fmt.Sprintf("%d:%s", cardID, mode)
 }
