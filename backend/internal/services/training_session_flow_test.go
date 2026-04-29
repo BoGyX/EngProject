@@ -2,7 +2,6 @@ package services
 
 import (
 	"english-learning/internal/models"
-	"fmt"
 	"testing"
 )
 
@@ -60,7 +59,7 @@ func TestSelectTrainingCardPlansForActiveBatchMovesToNextBatchAfterFirstIsComple
 	}
 }
 
-func TestBuildTrainingQueueForBatchKeepsChaosWithinSelectedWords(t *testing.T) {
+func TestBuildTrainingQueueForBatchPrioritizesStudyBeforePractice(t *testing.T) {
 	plans := []trainingSessionCardPlan{
 		{
 			Card:     trainingCardPlanStub{ID: 1}.toModel(),
@@ -75,31 +74,111 @@ func TestBuildTrainingQueueForBatchKeepsChaosWithinSelectedWords(t *testing.T) {
 	}
 
 	queue := buildTrainingQueueForBatch(plans)
-	if len(queue) != 6 {
-		t.Fatalf("expected 6 queue entries, got %d", len(queue))
+	if len(queue) != 2 {
+		t.Fatalf("expected 2 queue entries, got %d", len(queue))
 	}
 
-	expectedPairs := map[string]int{
-		"1:view":        1,
-		"1:choice":      1,
-		"1:constructor": 1,
-		"2:view":        1,
-		"2:choice":      1,
-		"2:constructor": 1,
-	}
-
+	seenCards := map[int64]bool{}
 	for _, entry := range queue {
-		key := trainingQueuePairKey(entry.CardID, entry.Mode)
-		if expectedPairs[key] == 0 {
-			t.Fatalf("unexpected queue entry %s", key)
+		if seenCards[entry.CardID] {
+			t.Fatalf("card %d should appear only once per session", entry.CardID)
 		}
-		expectedPairs[key]--
+		seenCards[entry.CardID] = true
+
+		switch entry.CardID {
+		case 1, 2:
+			if entry.Mode != "view" {
+				t.Fatalf("expected study mode view for card %d, got %q", entry.CardID, entry.Mode)
+			}
+		default:
+			t.Fatalf("unexpected card %d in queue", entry.CardID)
+		}
 	}
 
-	for key, remaining := range expectedPairs {
-		if remaining != 0 {
-			t.Fatalf("expected queue entry %s to appear exactly once, remaining=%d", key, remaining)
+	if !seenCards[1] || !seenCards[2] {
+		t.Fatalf("expected both selected cards to appear exactly once, got %+v", seenCards)
+	}
+}
+
+func TestBuildTrainingQueueForBatchKeepsStudyingUntilAllSelectedWordsAreViewed(t *testing.T) {
+	plans := []trainingSessionCardPlan{
+		{
+			Card:     trainingCardPlanStub{ID: 1}.toModel(),
+			Modes:    []string{"view", "choice"},
+			Progress: 0,
+		},
+		{
+			Card:     trainingCardPlanStub{ID: 2}.toModel(),
+			Modes:    []string{"choice", "constructor"},
+			Progress: 50,
+		},
+	}
+
+	queue := buildTrainingQueueForBatch(plans)
+	if len(queue) != 1 {
+		t.Fatalf("expected only 1 study entry while some words are still being introduced, got %d", len(queue))
+	}
+	if queue[0].CardID != 1 || queue[0].Mode != "view" {
+		t.Fatalf("expected only card 1 in view mode, got %+v", queue[0])
+	}
+}
+
+func TestBuildTrainingQueueForBatchUsesSingleRandomPracticeModePerWordAfterStudy(t *testing.T) {
+	plans := []trainingSessionCardPlan{
+		{
+			Card:     trainingCardPlanStub{ID: 1}.toModel(),
+			Modes:    []string{"choice", "constructor"},
+			Progress: 25,
+		},
+		{
+			Card:     trainingCardPlanStub{ID: 2}.toModel(),
+			Modes:    []string{"choice", "russian", "constructor"},
+			Progress: 50,
+		},
+	}
+
+	queue := buildTrainingQueueForBatch(plans)
+	if len(queue) != 2 {
+		t.Fatalf("expected 2 practice entries, got %d", len(queue))
+	}
+
+	seenCards := map[int64]bool{}
+	for _, entry := range queue {
+		if seenCards[entry.CardID] {
+			t.Fatalf("card %d should appear only once per practice session", entry.CardID)
 		}
+		seenCards[entry.CardID] = true
+
+		switch entry.CardID {
+		case 1:
+			if entry.Mode != "choice" && entry.Mode != "constructor" {
+				t.Fatalf("unexpected practice mode %q for card 1", entry.Mode)
+			}
+		case 2:
+			if entry.Mode != "choice" && entry.Mode != "russian" && entry.Mode != "constructor" {
+				t.Fatalf("unexpected practice mode %q for card 2", entry.Mode)
+			}
+		default:
+			t.Fatalf("unexpected card %d in practice queue", entry.CardID)
+		}
+	}
+}
+
+func TestBuildTrainingQueueForBatchUsesOnlyRemainingModes(t *testing.T) {
+	plans := []trainingSessionCardPlan{
+		{
+			Card:     trainingCardPlanStub{ID: 7}.toModel(),
+			Modes:    []string{"russian"},
+			Progress: 75,
+		},
+	}
+
+	queue := buildTrainingQueueForBatch(plans)
+	if len(queue) != 1 {
+		t.Fatalf("expected 1 queue entry, got %d", len(queue))
+	}
+	if queue[0].CardID != 7 || queue[0].Mode != "russian" {
+		t.Fatalf("expected only remaining mode russian for card 7, got %+v", queue[0])
 	}
 }
 
@@ -109,8 +188,4 @@ type trainingCardPlanStub struct {
 
 func (s trainingCardPlanStub) toModel() *models.Card {
 	return &models.Card{ID: s.ID}
-}
-
-func trainingQueuePairKey(cardID int64, mode string) string {
-	return fmt.Sprintf("%d:%s", cardID, mode)
 }

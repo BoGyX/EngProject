@@ -621,7 +621,69 @@ func buildTrainingQueueForBatch(plans []trainingSessionCardPlan) []trainingSessi
 		return []trainingSessionQueueEntry{}
 	}
 
-	return buildMixedPracticeQueue(plans)
+	randomizedPlans := append([]trainingSessionCardPlan(nil), plans...)
+	shuffleTrainingCardPlans(randomizedPlans)
+
+	studyQueue := make([]trainingSessionQueueEntry, 0, len(randomizedPlans))
+	for _, plan := range randomizedPlans {
+		if plan.Card == nil || !hasTrainingMode(plan.Modes, "view") {
+			continue
+		}
+
+		studyQueue = append(studyQueue, trainingSessionQueueEntry{
+			CardID:   plan.Card.ID,
+			Mode:     "view",
+			Progress: plan.Progress,
+		})
+	}
+	if len(studyQueue) > 0 {
+		return studyQueue
+	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	queue := make([]trainingSessionQueueEntry, 0, len(randomizedPlans))
+
+	for _, plan := range randomizedPlans {
+		if plan.Card == nil || len(plan.Modes) == 0 {
+			continue
+		}
+
+		practiceModes := excludeTrainingMode(plan.Modes, "view")
+		if len(practiceModes) == 0 {
+			continue
+		}
+
+		mode := practiceModes[r.Intn(len(practiceModes))]
+		queue = append(queue, trainingSessionQueueEntry{
+			CardID:   plan.Card.ID,
+			Mode:     mode,
+			Progress: plan.Progress,
+		})
+	}
+
+	return queue
+}
+
+func hasTrainingMode(modes []string, target string) bool {
+	for _, mode := range modes {
+		if mode == target {
+			return true
+		}
+	}
+
+	return false
+}
+
+func excludeTrainingMode(modes []string, excluded string) []string {
+	filtered := make([]string, 0, len(modes))
+	for _, mode := range modes {
+		if mode == excluded {
+			continue
+		}
+		filtered = append(filtered, mode)
+	}
+
+	return filtered
 }
 
 func buildMixedPracticeQueue(plans []trainingSessionCardPlan) []trainingSessionQueueEntry {
