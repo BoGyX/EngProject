@@ -214,6 +214,7 @@ export default function Progress() {
   const { user } = useAuthStore()
   const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([])
   const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set())
+  const [expandedDecks, setExpandedDecks] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
   const [overallProgress, setOverallProgress] = useState(0)
 
@@ -288,10 +289,12 @@ export default function Progress() {
           : 0
       )
       setExpandedCourses(new Set(progressData.slice(0, 1).map((course) => course.courseId)))
+      setExpandedDecks(new Set(progressData.flatMap((course) => course.decks.map((deck) => deck.deckId))))
     } catch (error) {
       console.error('Error loading progress:', error)
       setCourseProgress([])
       setOverallProgress(0)
+      setExpandedDecks(new Set())
     } finally {
       setLoading(false)
     }
@@ -305,6 +308,16 @@ export default function Progress() {
       nextExpanded.add(courseId)
     }
     setExpandedCourses(nextExpanded)
+  }
+
+  const toggleDeck = (deckId: number) => {
+    const nextExpanded = new Set(expandedDecks)
+    if (nextExpanded.has(deckId)) {
+      nextExpanded.delete(deckId)
+    } else {
+      nextExpanded.add(deckId)
+    }
+    setExpandedDecks(nextExpanded)
   }
 
   const summary = useMemo(() => {
@@ -424,64 +437,158 @@ export default function Progress() {
 
                 {isExpanded && (
                   <div className="space-y-4 border-t border-gray-200 bg-gradient-to-br from-white to-slate-50 p-6">
-                    {course.decks.map((deck) => (
-                      <article key={deck.deckId} className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Подкурс</p>
-                            <h3 className="mt-2 text-xl font-semibold text-text-light">{deck.deckTitle}</h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                              Слов: {deck.totalCards} | Изучено: {deck.completedWords}
-                            </p>
-                          </div>
+                    {course.decks.map((deck) => {
+                      const isDeckExpanded = expandedDecks.has(deck.deckId)
 
-                          <div className="flex items-center gap-3">
-                            <span className="rounded-full bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700">
-                              {deck.averageProgress}% готово
-                            </span>
-                          </div>
-                        </div>
+                      return (
+                        <article key={deck.deckId} className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                          <button type="button" onClick={() => toggleDeck(deck.deckId)} className="w-full text-left">
+                            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Подкурс</p>
+                                <h3 className="mt-2 text-xl font-semibold text-text-light">{deck.deckTitle}</h3>
+                                <p className="mt-1 text-sm text-slate-500">
+                                  Слов: {deck.totalCards} | Изучено: {deck.completedWords}
+                                </p>
+                              </div>
 
-                        <div className="mt-5 grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-                          <div className="rounded-[22px] border border-rose-100 bg-rose-50/60 p-4">
-                            <div className="mb-4 flex items-center justify-between gap-3">
-                              <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-rose-700">По режимам</h4>
-                              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-700">
-                                {deck.modeSummaries.length} актив.
-                              </span>
+                              <div className="flex items-center gap-3">
+                                <span className="rounded-full bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700">
+                                  {deck.averageProgress}% готово
+                                </span>
+                                <span className="text-2xl text-slate-400">{isDeckExpanded ? '▾' : '▸'}</span>
+                              </div>
                             </div>
+                          </button>
 
-                            <div className="space-y-4">
-                              {deck.modeSummaries.map((modeSummary) => (
-                                <ProgressRow
-                                  key={modeSummary.key}
-                                  label={modeSummary.label}
-                                  value={modeSummary.percent}
-                                  extra={`${modeSummary.completedCount}/${modeSummary.availableCount} слов`}
-                                  colorClass={
-                                    modeSummary.key === 'view'
-                                      ? 'bg-rose-400'
-                                      : modeSummary.key === 'choice'
-                                        ? 'bg-rose-500'
-                                        : modeSummary.key === 'with_photo'
-                                          ? 'bg-orange-500'
-                                          : modeSummary.key === 'russian'
-                                            ? 'bg-amber-500'
-                                            : 'bg-red-700'
-                                  }
-                                  textClass={
-                                    modeSummary.key === 'view'
-                                      ? 'text-rose-500'
-                                      : modeSummary.key === 'choice'
-                                        ? 'text-rose-600'
-                                        : modeSummary.key === 'with_photo'
-                                          ? 'text-orange-600'
-                                          : modeSummary.key === 'russian'
-                                            ? 'text-amber-600'
-                                            : 'text-red-700'
-                                  }
-                                />
-                              ))}
+                          {isDeckExpanded && (
+                            <div className="mt-5 grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+                              <div className="rounded-[22px] border border-rose-100 bg-rose-50/60 p-4">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                  <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-rose-700">По режимам</h4>
+                                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-700">
+                                    {deck.modeSummaries.length} актив.
+                                  </span>
+                                </div>
+
+                                <div className="space-y-4">
+                                  {deck.modeSummaries.map((modeSummary) => (
+                                    <ProgressRow
+                                      key={modeSummary.key}
+                                      label={modeSummary.label}
+                                      value={modeSummary.percent}
+                                      extra={`${modeSummary.completedCount}/${modeSummary.availableCount} слов`}
+                                      colorClass={
+                                        modeSummary.key === 'view'
+                                          ? 'bg-rose-400'
+                                          : modeSummary.key === 'choice'
+                                            ? 'bg-rose-500'
+                                            : modeSummary.key === 'with_photo'
+                                              ? 'bg-orange-500'
+                                              : modeSummary.key === 'russian'
+                                                ? 'bg-amber-500'
+                                                : 'bg-red-700'
+                                      }
+                                      textClass={
+                                        modeSummary.key === 'view'
+                                          ? 'text-rose-500'
+                                          : modeSummary.key === 'choice'
+                                            ? 'text-rose-600'
+                                            : modeSummary.key === 'with_photo'
+                                              ? 'text-orange-600'
+                                              : modeSummary.key === 'russian'
+                                                ? 'text-amber-600'
+                                                : 'text-red-700'
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                {deck.words.map((word) => (
+                                  <div key={word.cardId} className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                      <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <h4 className="text-lg font-semibold text-text-light">{word.word}</h4>
+                                          {word.isCustom && (
+                                            <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800">
+                                              Моё слово
+                                            </span>
+                                          )}
+                                          <span
+                                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                              word.isCompleted
+                                                ? 'bg-green-100 text-green-800'
+                                                : word.progressPercentage > 0
+                                                  ? 'bg-amber-100 text-amber-800'
+                                                  : 'bg-slate-200 text-slate-700'
+                                            }`}
+                                          >
+                                            {word.statusLabel}
+                                          </span>
+                                        </div>
+                                        <p className="mt-1 text-sm text-slate-600">{word.translation}</p>
+                                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
+                                          {word.isCompleted ? 'Слово полностью закрыто' : `Текущий режим: ${word.currentModeLabel}`}
+                                        </p>
+                                      </div>
+
+                                      <div className="min-w-[110px] text-right">
+                                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Прогресс слова</p>
+                                        <p className="mt-1 text-2xl font-bold text-text-light">{word.progressPercentage}%</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-4 h-2 rounded-full bg-slate-200">
+                                      <div
+                                        className="h-2 rounded-full bg-link-light transition-all"
+                                        style={{ width: `${word.progressPercentage}%` }}
+                                      />
+                                    </div>
+
+                                    <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                                      {word.modes.map((mode) => (
+                                        <div
+                                          key={`${word.cardId}-${mode.key}`}
+                                          className={`rounded-2xl border px-3 py-3 ${
+                                            mode.completed
+                                              ? 'border-green-200 bg-green-50'
+                                              : mode.current
+                                                ? 'border-rose-200 bg-rose-50'
+                                                : 'border-slate-200 bg-white'
+                                          }`}
+                                        >
+                                          <p className="text-sm font-semibold text-text-light">{mode.shortLabel}</p>
+                                          <p
+                                            className={`mt-1 text-xs ${
+                                              mode.completed
+                                                ? 'text-green-700'
+                                                : mode.current
+                                                  ? 'text-rose-700'
+                                                  : 'text-slate-500'
+                                            }`}
+                                          >
+                                            {mode.completed ? 'Пройден' : mode.current ? 'Текущий' : 'Ждёт'}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {deck.averageProgress >= 100 && (
+                            <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
+                              Этот подкурс завершен на 100%.
+                            </div>
+                          )}
+                        </article>
+                      )
+                    })}
                             </div>
                           </div>
 

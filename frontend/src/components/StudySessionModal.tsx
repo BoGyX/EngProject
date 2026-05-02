@@ -10,6 +10,13 @@ interface StudySessionModalProps {
   onClose: () => void
 }
 
+interface FeedbackState {
+  correct: boolean
+  text: string
+  submittedAnswer?: string
+  correctAnswer?: string
+}
+
 function shuffleLetters(value: string): string[] {
   return value
     .split('')
@@ -31,17 +38,34 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return fallbackMessage
 }
 
+function getCorrectAnswer(card: TrainingCardState) {
+  switch (card.current_mode) {
+    case 'choice':
+      return card.translation
+    case 'with_photo':
+    case 'russian':
+    case 'constructor':
+      return card.word
+    default:
+      return undefined
+  }
+}
+
 export default function StudySessionModal({ course, deck, onClose }: StudySessionModalProps) {
   const [session, setSession] = useState<TrainingSessionState | null>(null)
+  const [pendingSession, setPendingSession] = useState<TrainingSessionState | null>(null)
+  const [answeredCard, setAnsweredCard] = useState<TrainingCardState | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [textAnswer, setTextAnswer] = useState('')
   const [constructorPool, setConstructorPool] = useState<string[]>([])
   const [constructorAnswer, setConstructorAnswer] = useState<string[]>([])
-  const [feedback, setFeedback] = useState<{ correct: boolean; text: string } | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null)
 
-  const currentCard = session?.current_card || null
+  const currentCard = answeredCard || session?.current_card || null
+  const sessionForProgress = pendingSession || session
+  const hasPendingAdvance = Boolean(pendingSession && answeredCard && feedback)
 
   useEffect(() => {
     void startSession()
@@ -57,37 +81,45 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
     if (currentCard.current_mode === 'constructor') {
       setConstructorAnswer([])
       setConstructorPool(shuffleLetters(currentCard.word))
+      return
     }
+
+    setConstructorAnswer([])
+    setConstructorPool([])
   }, [currentCard?.session_card_id, currentCard?.current_mode])
 
   const progressValue = useMemo(() => {
-    if (!session || session.cards.length === 0) {
+    if (!sessionForProgress || sessionForProgress.cards.length === 0) {
       return 0
     }
 
-    const completedSteps = session.cards.filter((card) => card.is_completed).length
-    return Math.round((completedSteps / session.cards.length) * 100)
-  }, [session])
+    const completedSteps = sessionForProgress.cards.filter((card) => card.is_completed).length
+    return Math.round((completedSteps / sessionForProgress.cards.length) * 100)
+  }, [sessionForProgress])
 
   const startSession = async () => {
     try {
       setLoading(true)
       setErrorMessage(null)
       setFeedback(null)
+      setPendingSession(null)
+      setAnsweredCard(null)
 
       const nextSession = await studyService.startTraining(deck.id, course.id)
       setSession(nextSession)
     } catch (error) {
       console.error('Error starting training session:', error)
       setSession(null)
-      setErrorMessage(getErrorMessage(error, '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u0435. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.'))
+      setPendingSession(null)
+      setAnsweredCard(null)
+      setErrorMessage(getErrorMessage(error, 'Не удалось запустить обучение. Попробуйте еще раз.'))
     } finally {
       setLoading(false)
     }
   }
 
   const submitAnswer = async (answer = '') => {
-    if (!currentCard || !session) {
+    if (!currentCard || !session || hasPendingAdvance) {
       return
     }
 
@@ -96,18 +128,22 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
       setFeedback(null)
 
       const response = await studyService.answerTraining(session.session.id, currentCard.session_card_id, answer)
-      setSession(response.session)
+
+      setPendingSession(response.session)
+      setAnsweredCard(currentCard)
       setFeedback({
         correct: response.is_correct,
         text: response.is_correct
-          ? '\u0412\u0435\u0440\u043D\u043E. \u041F\u0435\u0440\u0435\u0445\u043E\u0434\u0438\u043C \u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C\u0443 \u0441\u043B\u043E\u0432\u0443.'
-          : '\u0412\u044B \u043E\u0442\u0432\u0435\u0442\u0438\u043B\u0438 \u043D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u043E. \u041F\u0435\u0440\u0435\u0445\u043E\u0434\u0438\u043C \u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C\u0443 \u0441\u043B\u043E\u0432\u0443, \u0430 \u044D\u0442\u043E\u0442 \u0440\u0435\u0436\u0438\u043C \u043F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0441\u043D\u043E\u0432\u0430 \u0432 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0441\u0435\u0441\u0441\u0438\u0438.',
+          ? 'Вы ответили верно. Нажмите «Далее», чтобы перейти к следующей карточке.'
+          : 'Вы ответили неправильно. Попробуйте этот режим снова в следующей сессии, а сейчас перейдите далее.',
+        submittedAnswer: answer === 'viewed' ? undefined : answer,
+        correctAnswer: getCorrectAnswer(currentCard),
       })
     } catch (error) {
       console.error('Error submitting training answer:', error)
       setFeedback({
         correct: false,
-        text: getErrorMessage(error, '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u043E\u0442\u0432\u0435\u0442. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.'),
+        text: getErrorMessage(error, 'Не удалось проверить ответ. Попробуйте еще раз.'),
       })
     } finally {
       setSubmitting(false)
@@ -122,6 +158,60 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
     const normalizedUrl = config.getFullUrl(audioUrl)
     const audio = new Audio(normalizedUrl)
     audio.play().catch((error) => console.error('Error playing audio:', error))
+  }
+
+  const advanceToNextCard = () => {
+    if (!pendingSession) {
+      return
+    }
+
+    setSession(pendingSession)
+    setPendingSession(null)
+    setAnsweredCard(null)
+    setFeedback(null)
+  }
+
+  const renderAnswerReview = (card: TrainingCardState) => {
+    if (!feedback || !hasPendingAdvance) {
+      return null
+    }
+
+    return (
+      <div
+        className={`space-y-4 rounded-2xl border px-5 py-4 text-left ${
+          feedback.correct ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'
+        }`}
+      >
+        <p className="text-sm font-semibold leading-6">{feedback.text}</p>
+
+        {feedback.submittedAnswer && (
+          <div className="space-y-1 text-sm">
+            <p>
+              <span className="font-semibold">Ваш ответ:</span> {feedback.submittedAnswer}
+            </p>
+            {!feedback.correct && feedback.correctAnswer && (
+              <p>
+                <span className="font-semibold">Правильный ответ:</span> {feedback.correctAnswer}
+              </p>
+            )}
+          </div>
+        )}
+
+        {!feedback.submittedAnswer && card.current_mode === 'view' && (
+          <p className="text-sm">Карточка просмотра засчитана.</p>
+        )}
+
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            onClick={advanceToNextCard}
+            className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark"
+          >
+            Далее
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const renderMode = (card: TrainingCardState) => {
@@ -147,14 +237,19 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
               <p className="text-2xl font-medium text-gray-700">{card.translation}</p>
               {card.example && <p className="text-sm italic text-gray-500">{card.example}</p>}
             </div>
-            <button
-              type="button"
-              onClick={() => void submitAnswer('viewed')}
-              disabled={submitting}
-              className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
-            >
-              Понял, дальше
-            </button>
+
+            {!hasPendingAdvance && (
+              <button
+                type="button"
+                onClick={() => void submitAnswer('viewed')}
+                disabled={submitting}
+                className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+              >
+                Понял, дальше
+              </button>
+            )}
+
+            {renderAnswerReview(card)}
           </div>
         )
 
@@ -177,49 +272,65 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
               </div>
               {card.phonetic && <p className="text-lg text-gray-400">[{card.phonetic}]</p>}
             </div>
+
             <div className="grid gap-3">
-              {(card.options || []).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => void submitAnswer(option)}
-                  disabled={submitting}
-                  className="rounded-lg border-2 border-gray-200 bg-white px-5 py-4 text-left text-lg font-medium text-text-light transition-all hover:border-link-light hover:shadow-sm disabled:opacity-50"
-                >
-                  {option}
-                </button>
-              ))}
+              {(card.options || []).map((option) => {
+                const isCorrectOption = hasPendingAdvance && option === feedback?.correctAnswer
+                const isSelectedWrong = hasPendingAdvance && option === feedback?.submittedAnswer && !feedback?.correct
+
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => void submitAnswer(option)}
+                    disabled={submitting || hasPendingAdvance}
+                    className={`rounded-lg border-2 px-5 py-4 text-left text-lg font-medium transition-all disabled:opacity-70 ${
+                      isCorrectOption
+                        ? 'border-green-300 bg-green-50 text-green-800'
+                        : isSelectedWrong
+                          ? 'border-red-300 bg-red-50 text-red-800'
+                          : 'border-gray-200 bg-white text-text-light hover:border-link-light hover:shadow-sm'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                )
+              })}
             </div>
+
+            {renderAnswerReview(card)}
           </div>
         )
 
       case 'with_photo':
         return (
           <div className="space-y-6 text-center">
-            {card.image_url ? (
-              <img
-                src={config.getFullUrl(card.image_url)}
-                alt={card.word}
-                className="mx-auto h-64 w-full max-w-md rounded-xl object-cover"
-              />
-            ) : (
-              <div className="mx-auto flex h-64 w-full max-w-md items-center justify-center rounded-xl bg-gray-100 text-gray-400">
-                Нет картинки
-              </div>
-            )}
-            {card.audio_url && (
-              <div className="flex justify-center">
+            <div className="relative mx-auto w-full max-w-md">
+              {card.image_url ? (
+                <img
+                  src={config.getFullUrl(card.image_url)}
+                  alt={card.word}
+                  className="h-64 w-full rounded-xl object-cover"
+                />
+              ) : (
+                <div className="flex h-64 w-full items-center justify-center rounded-xl bg-gray-100 text-gray-400">
+                  Нет картинки
+                </div>
+              )}
+
+              {card.audio_url && (
                 <button
                   type="button"
                   onClick={() => playAudio(card.audio_url)}
-                  className="inline-flex items-center gap-2 rounded-full border border-link-light/30 bg-link-light/10 px-4 py-2 text-sm font-semibold text-link-light transition-colors hover:bg-link-light/20"
+                  className="absolute right-3 top-3 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/80 bg-white/90 text-2xl text-link-light shadow-lg transition-transform hover:scale-105"
                   title="Прослушать слово"
                 >
-                  <span className="text-lg">🔊</span>
-                  <span>Прослушать слово</span>
+                  <span aria-hidden="true">🔊</span>
+                  <span className="sr-only">Прослушать слово</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
+
             <div className="space-y-3">
               <p className="text-lg text-gray-500">Введите слово по картинке</p>
               <input
@@ -227,23 +338,28 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 value={textAnswer}
                 onChange={(event) => setTextAnswer(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && textAnswer.trim()) {
+                  if (event.key === 'Enter' && textAnswer.trim() && !hasPendingAdvance) {
                     void submitAnswer(textAnswer)
                   }
                 }}
-                className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-xl focus:border-link-light focus:outline-none"
+                disabled={hasPendingAdvance}
+                className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-xl focus:border-link-light focus:outline-none disabled:bg-gray-100"
                 placeholder="Введите английское слово"
                 autoFocus
               />
-              <button
-                type="button"
-                onClick={() => void submitAnswer(textAnswer)}
-                disabled={!textAnswer.trim() || submitting}
-                className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
-              >
-                Проверить
-              </button>
+              {!hasPendingAdvance && (
+                <button
+                  type="button"
+                  onClick={() => void submitAnswer(textAnswer)}
+                  disabled={!textAnswer.trim() || submitting}
+                  className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+                >
+                  Проверить
+                </button>
+              )}
             </div>
+
+            {renderAnswerReview(card)}
           </div>
         )
 
@@ -254,27 +370,34 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
               <p className="text-3xl font-medium text-gray-700">{card.translation}</p>
               {card.example && <p className="text-sm italic text-gray-500">{card.example}</p>}
             </div>
+
             <input
               type="text"
               value={textAnswer}
               onChange={(event) => setTextAnswer(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && textAnswer.trim()) {
+                if (event.key === 'Enter' && textAnswer.trim() && !hasPendingAdvance) {
                   void submitAnswer(textAnswer)
                 }
               }}
-              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-xl focus:border-link-light focus:outline-none"
+              disabled={hasPendingAdvance}
+              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-xl focus:border-link-light focus:outline-none disabled:bg-gray-100"
               placeholder="Введите слово на английском"
               autoFocus
             />
-            <button
-              type="button"
-              onClick={() => void submitAnswer(textAnswer)}
-              disabled={!textAnswer.trim() || submitting}
-              className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
-            >
-              Проверить
-            </button>
+
+            {!hasPendingAdvance && (
+              <button
+                type="button"
+                onClick={() => void submitAnswer(textAnswer)}
+                disabled={!textAnswer.trim() || submitting}
+                className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+              >
+                Проверить
+              </button>
+            )}
+
+            {renderAnswerReview(card)}
           </div>
         )
 
@@ -285,6 +408,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
               <p className="text-3xl font-medium text-gray-700">{card.translation}</p>
               {card.phonetic && <p className="text-sm text-gray-400">[{card.phonetic}]</p>}
             </div>
+
             <div className="min-h-20 rounded-xl bg-gray-100 p-4">
               <div className="flex flex-wrap justify-center gap-2">
                 {constructorAnswer.length === 0 ? (
@@ -300,7 +424,8 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                         setConstructorAnswer(nextAnswer)
                         setConstructorPool([...constructorPool, removed])
                       }}
-                      className="rounded-lg border-2 border-link-light bg-white px-4 py-2 text-2xl font-bold text-link-light"
+                      disabled={hasPendingAdvance}
+                      className="rounded-lg border-2 border-link-light bg-white px-4 py-2 text-2xl font-bold text-link-light disabled:opacity-70"
                     >
                       {letter}
                     </button>
@@ -308,6 +433,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 )}
               </div>
             </div>
+
             <div className="flex flex-wrap justify-center gap-2">
               {constructorPool.map((letter, index) => (
                 <button
@@ -319,12 +445,14 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                     nextPool.splice(index, 1)
                     setConstructorPool(nextPool)
                   }}
-                  className="rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-2xl font-bold text-text-light"
+                  disabled={hasPendingAdvance}
+                  className="rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-2xl font-bold text-text-light disabled:opacity-70"
                 >
                   {letter}
                 </button>
               ))}
             </div>
+
             <div className="flex items-center justify-center gap-3">
               <button
                 type="button"
@@ -332,19 +460,25 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                   setConstructorPool([...constructorPool, ...constructorAnswer])
                   setConstructorAnswer([])
                 }}
-                className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
+                disabled={hasPendingAdvance}
+                className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 disabled:opacity-70"
               >
                 Очистить
               </button>
-              <button
-                type="button"
-                onClick={() => void submitAnswer(constructorAnswer.join(''))}
-                disabled={constructorAnswer.length === 0 || submitting}
-                className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
-              >
-                Проверить
-              </button>
+
+              {!hasPendingAdvance && (
+                <button
+                  type="button"
+                  onClick={() => void submitAnswer(constructorAnswer.join(''))}
+                  disabled={constructorAnswer.length === 0 || submitting}
+                  className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+                >
+                  Проверить
+                </button>
+              )}
             </div>
+
+            {renderAnswerReview(card)}
           </div>
         )
 
@@ -413,7 +547,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
               <div className="hidden flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-400">
-                    Шаг {currentCard.sequence_number} из {session.cards.length}
+                    Шаг {currentCard.sequence_number} из {sessionForProgress?.cards.length || 0}
                   </p>
                   <p className="text-lg font-semibold text-link-light">
                     {getTrainingModeStepLabel(currentCard, currentCard.current_mode)}
@@ -425,12 +559,10 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 </div>
               </div>
 
-              {feedback && (
+              {feedback && !pendingSession && (
                 <div
                   className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                    feedback.correct
-                      ? 'border-green-200 bg-green-50 text-green-700'
-                      : 'border-red-200 bg-red-50 text-red-700'
+                    feedback.correct ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'
                   }`}
                 >
                   {feedback.text}
