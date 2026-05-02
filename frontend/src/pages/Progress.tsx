@@ -226,6 +226,8 @@ export default function Progress() {
     if (!user?.id) {
       setCourseProgress([])
       setOverallProgress(0)
+      setExpandedCourses(new Set())
+      setExpandedDecks(new Set())
       setLoading(false)
       return
     }
@@ -294,6 +296,7 @@ export default function Progress() {
       console.error('Error loading progress:', error)
       setCourseProgress([])
       setOverallProgress(0)
+      setExpandedCourses(new Set())
       setExpandedDecks(new Set())
     } finally {
       setLoading(false)
@@ -362,8 +365,7 @@ export default function Progress() {
             <div>
               <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Мой прогресс</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Внутри каждого подкурса видно каждое слово, его текущий режим, процент прохождения и то, какие этапы уже
-                закрыты.
+                Внутри каждого подкурса видно каждое слово, его текущий режим, процент прохождения и то, какие этапы уже закрыты.
               </p>
             </div>
 
@@ -583,97 +585,12 @@ export default function Progress() {
 
                           {deck.averageProgress >= 100 && (
                             <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-                              Этот подкурс завершен на 100%.
+                              Этот подкурс завершён на 100%.
                             </div>
                           )}
                         </article>
                       )
                     })}
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            {deck.words.map((word) => (
-                              <div key={word.cardId} className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
-                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                  <div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <h4 className="text-lg font-semibold text-text-light">{word.word}</h4>
-                                      {word.isCustom && (
-                                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800">
-                                          Моё слово
-                                        </span>
-                                      )}
-                                      <span
-                                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                          word.isCompleted
-                                            ? 'bg-green-100 text-green-800'
-                                            : word.progressPercentage > 0
-                                              ? 'bg-amber-100 text-amber-800'
-                                              : 'bg-slate-200 text-slate-700'
-                                        }`}
-                                      >
-                                        {word.statusLabel}
-                                      </span>
-                                    </div>
-                                    <p className="mt-1 text-sm text-slate-600">{word.translation}</p>
-                                    <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
-                                      {word.isCompleted ? 'Слово полностью закрыто' : `Текущий режим: ${word.currentModeLabel}`}
-                                    </p>
-                                  </div>
-
-                                  <div className="min-w-[110px] text-right">
-                                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Прогресс слова</p>
-                                    <p className="mt-1 text-2xl font-bold text-text-light">{word.progressPercentage}%</p>
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 h-2 rounded-full bg-slate-200">
-                                  <div
-                                    className="h-2 rounded-full bg-link-light transition-all"
-                                    style={{ width: `${word.progressPercentage}%` }}
-                                  />
-                                </div>
-
-                                <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-                                  {word.modes.map((mode) => (
-                                    <div
-                                      key={`${word.cardId}-${mode.key}`}
-                                      className={`rounded-2xl border px-3 py-3 ${
-                                        mode.completed
-                                          ? 'border-green-200 bg-green-50'
-                                          : mode.current
-                                            ? 'border-rose-200 bg-rose-50'
-                                            : 'border-slate-200 bg-white'
-                                      }`}
-                                    >
-                                      <p className="text-sm font-semibold text-text-light">{mode.shortLabel}</p>
-                                      <p
-                                        className={`mt-1 text-xs ${
-                                          mode.completed
-                                            ? 'text-green-700'
-                                            : mode.current
-                                              ? 'text-rose-700'
-                                              : 'text-slate-500'
-                                        }`}
-                                      >
-                                        {mode.completed ? 'Пройден' : mode.current ? 'Текущий' : 'Ждет'}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {deck.averageProgress >= 100 && (
-                          <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-                            Этот подкурс завершен на 100%.
-                          </div>
-                        )}
-                      </article>
-                    ))}
                   </div>
                 )}
               </section>
