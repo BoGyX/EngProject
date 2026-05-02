@@ -207,6 +207,19 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 Нет картинки
               </div>
             )}
+            {card.audio_url && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => playAudio(card.audio_url)}
+                  className="inline-flex items-center gap-2 rounded-full border border-link-light/30 bg-link-light/10 px-4 py-2 text-sm font-semibold text-link-light transition-colors hover:bg-link-light/20"
+                  title="Прослушать слово"
+                >
+                  <span className="text-lg">🔊</span>
+                  <span>Прослушать слово</span>
+                </button>
+              </div>
+            )}
             <div className="space-y-3">
               <p className="text-lg text-gray-500">Введите слово по картинке</p>
               <input

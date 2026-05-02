@@ -4,6 +4,7 @@ import (
 	"context"
 	"english-learning/internal/models"
 	"errors"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -119,12 +120,20 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 	if err != nil {
 		return nil, err
 	}
+
+	queueEntries, err := s.buildScopedTrainingQueue(userID, userDeck)
+	if err != nil {
+		return nil, err
+	}
+
 	if openSessionID, err := s.getLatestOpenScopedSessionID(userID, userDeck.ID); err != nil {
 		return nil, err
 	} else if openSessionID != 0 {
 		existingState, err := s.GetTrainingSessionStateByID(openSessionID, &userID)
 		if err == nil && existingState != nil {
-			if existingState.CurrentCard != nil && !sessionExceedsTrainingBatch(existingState.Cards, trainingSessionBatchSize) {
+			if existingState.CurrentCard != nil &&
+				!sessionExceedsTrainingBatch(existingState.Cards, trainingSessionBatchSize) &&
+				trainingSessionMatchesQueue(existingState.Cards, queueEntries) {
 				return existingState, nil
 			}
 			if _, finishErr := s.FinishTrainingSession(openSessionID); finishErr != nil {
@@ -133,10 +142,6 @@ func (s *TrainingSessionService) StartScopedTrainingSession(userID uuid.UUID, co
 		}
 	}
 
-	queueEntries, err := s.buildScopedTrainingQueue(userID, userDeck)
-	if err != nil {
-		return nil, err
-	}
 	if len(queueEntries) == 0 {
 		return nil, errors.New("no unfinished cards available for training")
 	}
@@ -636,12 +641,8 @@ func buildTrainingQueueForBatch(plans []trainingSessionCardPlan) []trainingSessi
 			Progress: plan.Progress,
 		})
 	}
-	if len(studyQueue) > 0 {
-		return studyQueue
-	}
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	queue := make([]trainingSessionQueueEntry, 0, len(randomizedPlans))
+	practicePlans := make([]trainingSessionCardPlan, 0, len(randomizedPlans))
 
 	for _, plan := range randomizedPlans {
 		if plan.Card == nil || len(plan.Modes) == 0 {
@@ -653,13 +654,16 @@ func buildTrainingQueueForBatch(plans []trainingSessionCardPlan) []trainingSessi
 			continue
 		}
 
-		mode := practiceModes[r.Intn(len(practiceModes))]
-		queue = append(queue, trainingSessionQueueEntry{
-			CardID:   plan.Card.ID,
-			Mode:     mode,
+		practicePlans = append(practicePlans, trainingSessionCardPlan{
+			Card:     plan.Card,
+			UserCard: plan.UserCard,
+			Modes:    practiceModes,
 			Progress: plan.Progress,
 		})
 	}
+
+	queue := append([]trainingSessionQueueEntry{}, studyQueue...)
+	queue = append(queue, buildMixedPracticeQueue(practicePlans)...)
 
 	return queue
 }
@@ -764,6 +768,37 @@ func sessionExceedsTrainingBatch(cards []models.TrainingSessionCardState, batchS
 	}
 
 	return false
+}
+
+func trainingSessionMatchesQueue(cards []models.TrainingSessionCardState, queue []trainingSessionQueueEntry) bool {
+	pendingCounts := make(map[string]int)
+	for _, card := range cards {
+		if card.IsCompleted {
+			continue
+		}
+		pendingCounts[trainingQueueEntryKey(card.CardID, card.CurrentMode)]++
+	}
+
+	queueCounts := make(map[string]int)
+	for _, entry := range queue {
+		queueCounts[trainingQueueEntryKey(entry.CardID, entry.Mode)]++
+	}
+
+	if len(pendingCounts) != len(queueCounts) {
+		return false
+	}
+
+	for key, count := range pendingCounts {
+		if queueCounts[key] != count {
+			return false
+		}
+	}
+
+	return true
+}
+
+func trainingQueueEntryKey(cardID int64, mode string) string {
+	return fmt.Sprintf("%d#%s", cardID, mode)
 }
 
 func (s *TrainingSessionService) getFirstDeckIDByCourse(courseID int64) (int64, error) {
@@ -935,10 +970,22 @@ func (s *TrainingSessionService) refreshScopedDeckAndCourseProgress(ctx context.
 	}
 
 	progress := 0.0
-	status := "in_progress"
 	if totalCards > 0 {
-		progress = float64(learnedCards) * 100 / float64(totalCards)
+		if err := tx.QueryRow(ctx,
+			`SELECT COALESCE(AVG(COALESCE(uc.progress_percentage, 0)), 0)
+			 FROM cards c
+			 LEFT JOIN user_cards uc
+			   ON uc.card_id = c.id
+			  AND uc.user_id = $2
+			  AND uc.user_deck_id = $3
+			 WHERE c.deck_id = $1`,
+			deckID, userID, userDeckID,
+		).Scan(&progress); err != nil {
+			return err
+		}
 	}
+
+	status := "in_progress"
 	if totalCards == 0 {
 		status = "not_started"
 	}
@@ -976,7 +1023,14 @@ func (s *TrainingSessionService) refreshScopedDeckAndCourseProgress(ctx context.
 
 	courseProgress := 0.0
 	if totalDecks > 0 {
-		courseProgress = float64(completedDecks) * 100 / float64(totalDecks)
+		if err := tx.QueryRow(ctx,
+			`SELECT COALESCE(AVG(progress_percentage), 0)
+			 FROM user_decks
+			 WHERE user_course_id = $1`,
+			*userCourseID,
+		).Scan(&courseProgress); err != nil {
+			return err
+		}
 	}
 
 	_, err := tx.Exec(ctx,
