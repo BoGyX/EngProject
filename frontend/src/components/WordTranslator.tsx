@@ -20,6 +20,8 @@ export default function WordTranslator() {
   const [newTranslation, setNewTranslation] = useState('')
   const [savingTranslation, setSavingTranslation] = useState(false)
   const [translationMessage, setTranslationMessage] = useState<string | null>(null)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280))
+  const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 800))
   const timeoutRef = useRef<number | null>(null)
 
   const hasPersonalTranslations = personalTranslations.length > 0
@@ -32,6 +34,11 @@ export default function WordTranslator() {
       }),
     [personalTranslations]
   )
+
+  const isMobileView = viewportWidth < 640
+  const tooltipWidth = Math.min(384, Math.max(280, viewportWidth - 24))
+  const tooltipLeft = position ? Math.min(Math.max(12, position.x + 10), Math.max(12, viewportWidth - tooltipWidth - 12)) : 12
+  const tooltipTop = position ? Math.min(Math.max(12, position.y + 10), Math.max(12, viewportHeight - 220)) : 12
 
   const closeTooltip = () => {
     setPosition(null)
@@ -62,6 +69,20 @@ export default function WordTranslator() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth)
+      setViewportHeight(window.innerHeight)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
 
   useEffect(() => {
     const handleMouseUp = async (event: MouseEvent) => {
@@ -148,6 +169,8 @@ export default function WordTranslator() {
     } catch (error: any) {
       console.error('Error deleting personal translation:', error)
       setTranslationMessage(error?.response?.data?.error || 'Не удалось удалить перевод.')
+    } finally {
+      setSavingTranslation(false)
     }
   }
 
@@ -157,11 +180,20 @@ export default function WordTranslator() {
 
   return (
     <div
-      className="word-translator-tooltip fixed z-50 max-w-sm rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl"
-      style={{
-        left: `${position.x + 10}px`,
-        top: `${position.y + 10}px`,
-      }}
+      className="word-translator-tooltip fixed z-50 rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl"
+      style={
+        isMobileView
+          ? {
+              left: '12px',
+              right: '12px',
+              bottom: '12px',
+            }
+          : {
+              width: `${tooltipWidth}px`,
+              left: `${tooltipLeft}px`,
+              top: `${tooltipTop}px`,
+            }
+      }
     >
       {loading ? (
         <div className="flex items-center space-x-2">
@@ -171,12 +203,12 @@ export default function WordTranslator() {
       ) : (
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
-            <div>
-              <h3 className="text-xl font-bold text-slate-800">{translation?.word || selectedWord}</h3>
+            <div className="min-w-0">
+              <h3 className="break-words text-lg font-bold text-slate-800 sm:text-xl">{translation?.word || selectedWord}</h3>
               {translation?.phonetic && <p className="mt-1 text-sm text-slate-500">[{translation.phonetic}]</p>}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {translation?.audio_url && (
                 <button
                   type="button"
@@ -199,7 +231,7 @@ export default function WordTranslator() {
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Базовый перевод</p>
-            <p className="mt-2 text-base font-medium text-slate-700">
+            <p className="mt-2 break-words text-base font-medium text-slate-700">
               {translation?.translation || 'Перевод не найден'}
             </p>
             {translation?.example && <p className="mt-2 text-sm italic text-slate-500">"{translation.example}"</p>}
@@ -220,11 +252,11 @@ export default function WordTranslator() {
                     key={item.id}
                     className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-2"
                   >
-                    <span className="text-sm font-medium text-slate-700">{item.translation}</span>
+                    <span className="min-w-0 break-words text-sm font-medium text-slate-700">{item.translation}</span>
                     <button
                       type="button"
                       onClick={() => void handleDeleteTranslation(item.id)}
-                      className="text-sm font-semibold text-red-500 transition-colors hover:text-red-700"
+                      className="shrink-0 text-sm font-semibold text-red-500 transition-colors hover:text-red-700"
                       title="Удалить перевод"
                     >
                       ×
@@ -236,7 +268,7 @@ export default function WordTranslator() {
               <p className="text-sm text-slate-500">Пока нет ваших личных переводов для этого слова.</p>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 value={newTranslation}

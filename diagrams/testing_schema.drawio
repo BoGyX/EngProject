@@ -1,0 +1,58 @@
+<mxfile host="app.diagrams.net" modified="2026-05-12T00:00:00.000Z" agent="5.0 (Windows)" etag="12346" version="20.5.3" type="device">
+  <diagram id="testing-schema" name="Testing Schema">
+    <mxGraphModel dx="1000" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="root" value="Схема тестирования" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="340" y="40" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="functional" value="Функциональное" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="80" y="160" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="integration" value="Интеграционное" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="320" y="160" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="performance" value="Нагрузочное" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="560" y="160" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="userTests" value="Тестирование пользователя" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="80" y="300" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="adminTests" value="Тестирование администратора" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="320" y="300" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="apiTests" value="API / Backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="560" y="300" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-functional" edge="1" source="root" target="functional" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-integration" edge="1" source="root" target="integration" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-performance" edge="1" source="root" target="performance" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-functional-user" edge="1" source="functional" target="userTests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-functional-admin" edge="1" source="functional" target="adminTests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-integration-api" edge="1" source="integration" target="apiTests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="text-user1" value="Регистрация / вход\nРабота с карточками\nТренировка" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="text-admin1" value="Управление курсами\nИмпорт / экспорт\nПрава доступа" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="320" y="400" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="text-api1" value="API авторизации\nCRUD карточек\nСессии тренировок" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="560" y="400" width="180" height="90" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

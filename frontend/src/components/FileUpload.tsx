@@ -128,7 +128,7 @@ export default function FileUpload({ type, currentUrl, onUrlChange, label, place
     <div>
       <label className="mb-2 block text-sm font-medium text-text-light">{label}</label>
 
-      <div className="mb-2 flex space-x-2">
+      <div className="mb-2 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setUploadMode('url')}

@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1060" viewBox="0 0 1600 1060">
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#ece7e2" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#6b7280"/>
+    </marker>
+    <style>
+      .title { font: 700 32px 'Segoe UI', Arial, sans-serif; fill: #1f2937; }
+      .subtitle { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #6b7280; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; ry: 18; }
+      .header { fill: #d1fae5; stroke: #10b981; stroke-width: 2; rx: 18; ry: 18; }
+      .section-title { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #111827; }
+      .section-copy { font: 400 14px 'Segoe UI', Arial, sans-serif; fill: #374151; }
+      .small-title { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #111827; }
+      .line { stroke: #6b7280; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .note { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #065f46; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1060" fill="url(#grid)"/>
+
+  <text x="800" y="56" text-anchor="middle" class="title">Frontend Architecture</text>
+  <text x="800" y="84" text-anchor="middle" class="subtitle">React + Vite client for courses, training sessions, reader and admin flows</text>
+
+  <rect x="645" y="118" width="310" height="92" class="header"/>
+  <text x="800" y="152" text-anchor="middle" class="section-title">main.tsx + App.tsx</text>
+  <text x="800" y="178" text-anchor="middle" class="section-copy">Mounts React, sets routes, guards and the application shell</text>
+
+  <rect x="80" y="280" width="270" height="210" class="box"/>
+  <text x="102" y="314" class="small-title">Routing and guards</text>
+  <text x="102" y="342" class="section-copy">
+    <tspan x="102" dy="0">- BrowserRouter and Routes</tspan>
+    <tspan x="102" dy="22">- PrivateRoute</tspan>
+    <tspan x="102" dy="22">- AdminRoute</tspan>
+    <tspan x="102" dy="22">- /courses, /deck, /vocabulary</tspan>
+    <tspan x="102" dy="22">- /reader and /reader/:id</tspan>
+    <tspan x="102" dy="22">- /admin/* pages</tspan>
+  </text>
+
+  <rect x="390" y="280" width="280" height="210" class="box"/>
+  <text x="412" y="314" class="small-title">Layout and shell</text>
+  <text x="412" y="342" class="section-copy">
+    <tspan x="412" dy="0">- components/Layout.tsx</tspan>
+    <tspan x="412" dy="22">- top navigation and logout</tspan>
+    <tspan x="412" dy="22">- hides chrome in iframe mode</tspan>
+    <tspan x="412" dy="22">- renders Outlet for pages</tspan>
+    <tspan x="412" dy="22">- mounts global WordTranslator</tspan>
+    <tspan x="412" dy="22">- shared CSS from index.css</tspan>
+  </text>
+
+  <rect x="710" y="280" width="260" height="210" class="box"/>
+  <text x="732" y="314" class="small-title">State store</text>
+  <text x="732" y="342" class="section-copy">
+    <tspan x="732" dy="0">- store/authStore.ts</tspan>
+    <tspan x="732" dy="22">- Zustand + persist middleware</tspan>
+    <tspan x="732" dy="22">- user, role and auth flags</tspan>
+    <tspan x="732" dy="22">- accessToken and refreshToken</tspan>
+    <tspan x="732" dy="22">- login, register, logout actions</tspan>
+    <tspan x="732" dy="22">- used by route guards and pages</tspan>
+  </text>
+
+  <rect x="1010" y="280" width="250" height="210" class="box"/>
+  <text x="1032" y="314" class="small-title">HTTP layer</text>
+  <text x="1032" y="342" class="section-copy">
+    <tspan x="1032" dy="0">- services/api.ts</tspan>
+    <tspan x="1032" dy="22">- Axios instance with baseURL</tspan>
+    <tspan x="1032" dy="22">- auth token injection</tspan>
+    <tspan x="1032" dy="22">- FormData handling for uploads</tspan>
+    <tspan x="1032" dy="22">- 401 redirect handling</tspan>
+    <tspan x="1032" dy="22">- shared entry for service calls</tspan>
+  </text>
+
+  <rect x="1300" y="280" width="230" height="210" class="box"/>
+  <text x="1322" y="314" class="small-title">Backend API</text>
+  <text x="1322" y="342" class="section-copy">
+    <tspan x="1322" dy="0">- auth</tspan>
+    <tspan x="1322" dy="22">- courses and decks</tspan>
+    <tspan x="1322" dy="22">- training sessions</tspan>
+    <tspan x="1322" dy="22">- reader and podcasts</tspan>
+    <tspan x="1322" dy="22">- uploads</tspan>
+    <tspan x="1322" dy="22">- admin endpoints</tspan>
+  </text>
+
+  <rect x="70" y="560" width="370" height="400" class="box"/>
+  <text x="92" y="596" class="section-title">Pages</text>
+  <text x="92" y="626" class="section-copy">
+    <tspan x="92" dy="0">- Login.tsx, Register.tsx</tspan>
+    <tspan x="92" dy="22">- Courses.tsx</tspan>
+    <tspan x="92" dy="22">- CourseDeckPage.tsx</tspan>
+    <tspan x="92" dy="22">- VocabularyDeckPage.tsx</tspan>
+    <tspan x="92" dy="22">- Progress.tsx</tspan>
+    <tspan x="92" dy="22">- Reader.tsx, ReaderTextPage.tsx, ReadText.tsx</tspan>
+    <tspan x="92" dy="22">- AdminDashboard.tsx</tspan>
+    <tspan x="92" dy="22">- AdminCourses.tsx</tspan>
+    <tspan x="92" dy="22">- AdminDecks.tsx</tspan>
+    <tspan x="92" dy="22">- AdminUsers.tsx</tspan>
+    <tspan x="92" dy="22">- AdminPodcasts.tsx</tspan>
+  </text>
+  <text x="92" y="870" class="note">Route-level screens for user and admin workflows.</text>
+
+  <rect x="470" y="560" width="350" height="400" class="box"/>
+  <text x="492" y="596" class="section-title">Components</text>
+  <text x="492" y="626" class="section-copy">
+    <tspan x="492" dy="0">- Layout.tsx</tspan>
+    <tspan x="492" dy="22">- StudyCards.tsx</tspan>
+    <tspan x="492" dy="22">- StudySessionModal.tsx</tspan>
+    <tspan x="492" dy="22">- FileUpload.tsx</tspan>
+    <tspan x="492" dy="22">- WordTranslator.tsx</tspan>
+    <tspan x="492" dy="22">- UserTranslationInput.tsx</tspan>
+    <tspan x="492" dy="22">- modal and card interaction UI</tspan>
+    <tspan x="492" dy="22">- audio, images and answer forms</tspan>
+  </text>
+  <text x="492" y="826" class="note">Reusable building blocks shared by page screens.</text>
+
+  <rect x="850" y="560" width="350" height="400" class="box"/>
+  <text x="872" y="596" class="section-title">Services</text>
+  <text x="872" y="626" class="section-copy">
+    <tspan x="872" dy="0">- authService.ts</tspan>
+    <tspan x="872" dy="22">- adminService.ts</tspan>
+    <tspan x="872" dy="22">- studyService.ts</tspan>
+    <tspan x="872" dy="22">- uploadService.ts</tspan>
+    <tspan x="872" dy="22">- vocabularyService.ts</tspan>
+    <tspan x="872" dy="22">- dictionaryService.ts</tspan>
+    <tspan x="872" dy="22">- wordTranslationService.ts</tspan>
+    <tspan x="872" dy="22">- personalTranslationService.ts</tspan>
+    <tspan x="872" dy="22">- wrapper layer over api.ts</tspan>
+  </text>
+  <text x="872" y="848" class="note">Maps UI actions to backend endpoints.</text>
+
+  <rect x="1230" y="560" width="300" height="400" class="box"/>
+  <text x="1252" y="596" class="section-title">Helpers and config</text>
+  <text x="1252" y="626" class="section-copy">
+    <tspan x="1252" dy="0">- config.ts</tspan>
+    <tspan x="1252" dy="22">- utils/courseProgress.ts</tspan>
+    <tspan x="1252" dy="22">- utils/trainingModes.ts</tspan>
+    <tspan x="1252" dy="22">- utils/slug.ts</tspan>
+    <tspan x="1252" dy="22">- vite.config.ts</tspan>
+    <tspan x="1252" dy="22">- index.css and Tailwind setup</tspan>
+    <tspan x="1252" dy="22">- package.json / Vite runtime</tspan>
+  </text>
+  <text x="1252" y="804" class="note">Shared config, helpers and build/runtime setup.</text>
+
+  <path d="M 800 210 L 800 248" class="line"/>
+  <path d="M 800 248 L 215 248 L 215 280" class="line"/>
+  <path d="M 800 248 L 530 248 L 530 280" class="line"/>
+  <path d="M 800 248 L 840 248 L 840 280" class="line"/>
+  <path d="M 800 248 L 1135 248 L 1135 280" class="line"/>
+  <path d="M 800 248 L 1415 248 L 1415 280" class="line"/>
+
+  <path d="M 215 490 L 215 530 L 255 530 L 255 560" class="line"/>
+  <path d="M 530 490 L 530 530 L 645 530 L 645 560" class="line"/>
+  <path d="M 840 490 L 840 530 L 255 530 L 255 560" class="line"/>
+  <path d="M 840 490 L 840 530 L 645 530 L 645 560" class="line"/>
+  <path d="M 1135 490 L 1135 530 L 1025 530 L 1025 560" class="line"/>
+  <path d="M 1135 490 L 1135 530 L 1380 530 L 1380 560" class="line"/>
+  <path d="M 1025 760 L 1300 760" class="line"/>
+
+  <path d="M 440 760 L 470 760" class="line"/>
+  <path d="M 820 760 L 850 760" class="line"/>
+  <path d="M 1260 385 L 1300 385" class="line"/>
+
+  <text x="455" y="742" text-anchor="middle" class="subtitle">compose UI</text>
+  <text x="835" y="742" text-anchor="middle" class="subtitle">call services</text>
+  <text x="1280" y="742" text-anchor="middle" class="subtitle">use helpers</text>
+</svg>

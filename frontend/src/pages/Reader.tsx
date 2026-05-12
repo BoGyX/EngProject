@@ -207,7 +207,7 @@ export default function Reader() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 p-6 shadow-xl">
+      <section className="rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 p-4 shadow-xl sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -264,7 +264,7 @@ export default function Reader() {
           {isAdmin && (
             <button
               onClick={handleToggleUploadForm}
-              className="rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark"
+              className="w-full rounded-2xl bg-link-light px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-link-dark sm:w-auto"
             >
               {showUploadForm ? 'Скрыть форму' : 'Добавить текст'}
             </button>
@@ -273,7 +273,7 @@ export default function Reader() {
       </section>
 
       {isAdmin && showUploadForm && (
-        <section className="rounded-[28px] border border-rose-200 bg-white p-6 shadow-lg">
+        <section className="rounded-[28px] border border-rose-200 bg-white p-4 shadow-lg sm:p-6">
           <h2 className="text-xl font-bold text-text-light">Новый текст</h2>
           <p className="mt-2 text-sm text-slate-500">
             Заголовок поддерживает переносы через {'<br>'}, а для самого текста можно сразу прикрепить свою mp3-озвучку.
@@ -372,7 +372,7 @@ export default function Reader() {
               className="group cursor-pointer overflow-hidden rounded-[28px] border border-gray-200 bg-card-light shadow-md transition-all hover:-translate-y-1 hover:border-rose-300 hover:shadow-xl"
               onClick={() => openText(text.id)}
             >
-              <div className="p-6">
+              <div className="p-5 sm:p-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Текст reader</p>
                   {text.course_title && (
@@ -400,7 +400,7 @@ export default function Reader() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between border-t border-gray-200 bg-slate-50 px-6 py-4">
+              <div className="flex flex-col items-start justify-between gap-3 border-t border-gray-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
                 <span className="text-sm font-semibold text-link-light transition-colors group-hover:text-link-dark">Открыть reader</span>
                 {isAdmin && (
                   <button

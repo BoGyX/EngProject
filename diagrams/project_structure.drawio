@@ -1,0 +1,31 @@
+<mxfile host="app.diagrams.net" modified="2026-05-12T00:00:00.000Z" agent="5.0 (Windows)" etag="12347" version="20.5.3" type="device">
+  <diagram id="project-structure" name="Project Structure">
+    <mxGraphModel dx="1000" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="root" value="Проект EngProject" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="Frontend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="backend" value="Backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="460" y="120" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="fe_src" value="src/\n- App.tsx\n- main.tsx\n- config.ts\n- components/\n- pages/\n- services/\n- store/\n- utils/" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="240" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="fe_config" value="package.json\npostcss.config.js\ntsconfig.json\nvite.config.ts\nindex.html" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="460" width="240" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="be_internal" value="internal/\n- config/\n- database/\n- handlers/\n- middleware/\n- models/\n- services/\n- utils/" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;align=left;" vertex="1" parent="1">
+          <mxGeometry x="460" y="220" width="240" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="be_root" value="Dockerfile\ngo.mod\nREADME.md\nadd_security.py\nadd_security.sh\nmigrations/\nuploads/" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;align=left;" vertex="1" parent="1">
+          <mxGeometry x="460" y="460" width="240" height="140" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

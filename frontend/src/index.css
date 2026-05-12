@@ -9,6 +9,10 @@ body,
   height: 100%;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -34,4 +38,26 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

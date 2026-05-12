@@ -33,7 +33,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 shadow-xl">
-        <div className="grid gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-8">
+        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-8">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-link-light shadow-sm">
@@ -78,7 +78,7 @@ export default function AdminDashboard() {
         ))}
       </section>
 
-      <section className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
+      <section className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
         <h2 className="text-xl font-semibold text-text-light">Быстрые действия</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Link

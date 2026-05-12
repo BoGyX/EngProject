@@ -217,7 +217,7 @@ export default function AdminCourses() {
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 shadow-xl">
-        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:p-8">
+        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:p-8">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-link-light shadow-sm">
@@ -252,7 +252,7 @@ export default function AdminCourses() {
                   setImportStatus('')
                 }
               }}
-              className="rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark"
+              className="w-full rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark sm:w-auto"
             >
               {showForm ? 'Скрыть форму' : 'Создать курс'}
             </button>
@@ -261,7 +261,7 @@ export default function AdminCourses() {
       </section>
 
       {showForm && (
-        <section className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
+        <section className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
           <h2 className="text-xl font-semibold text-text-light">
             {editingCourse ? 'Редактировать курс' : 'Создать новый курс'}
           </h2>
@@ -402,7 +402,7 @@ export default function AdminCourses() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <button
                 type="submit"
                 disabled={uploading}

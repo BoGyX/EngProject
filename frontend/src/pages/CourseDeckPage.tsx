@@ -380,19 +380,19 @@ export default function CourseDeckPage() {
       </Link>
 
       <section className="overflow-hidden rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 shadow-xl">
-        <div className="grid gap-8 p-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:p-8">
+        <div className="grid gap-6 p-4 sm:gap-8 sm:p-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:p-8">
           <div className="relative">
             {course.image_url ? (
               <img
                 src={config.getFullUrl(course.image_url)}
                 alt={course.title}
-                className="h-52 w-full rounded-[24px] object-cover shadow-lg lg:h-full"
+                className="h-44 w-full rounded-[24px] object-cover shadow-lg sm:h-52 lg:h-full"
                 onError={(event) => {
                   ;(event.target as HTMLImageElement).style.display = 'none'
                 }}
               />
             ) : (
-              <div className="flex h-52 w-full items-center justify-center rounded-[24px] bg-gradient-to-br from-rose-100 to-orange-100 text-6xl shadow-lg">
+              <div className="flex h-44 w-full items-center justify-center rounded-[24px] bg-gradient-to-br from-rose-100 to-orange-100 text-5xl shadow-lg sm:h-52 sm:text-6xl">
                 📘
               </div>
             )}
@@ -421,8 +421,8 @@ export default function CourseDeckPage() {
             </div>
 
             <div className="space-y-3">
-              <h1 className="text-3xl font-bold text-text-light lg:text-4xl">{course.title}</h1>
-              {course.description && <p className="max-w-3xl text-base leading-7 text-slate-600">{course.description}</p>}
+              <h1 className="text-2xl font-bold text-text-light sm:text-3xl lg:text-4xl">{course.title}</h1>
+              {course.description && <p className="max-w-3xl text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">{course.description}</p>}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -466,8 +466,8 @@ export default function CourseDeckPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="rounded-[28px] border border-gray-200 bg-card-light p-5 shadow-md">
+      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-5">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-text-light">Деки курса</h2>
@@ -572,11 +572,11 @@ export default function CourseDeckPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
+              <div className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-3xl font-bold text-text-light">{selectedDeck.title}</h2>
+                      <h2 className="text-2xl font-bold text-text-light sm:text-3xl">{selectedDeck.title}</h2>
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${
                           selectedDeckPresentation.state === 'completed'
@@ -597,7 +597,7 @@ export default function CourseDeckPage() {
                     {selectedDeck.description && <p className="max-w-3xl text-base leading-7 text-slate-600">{selectedDeck.description}</p>}
 
                     <div className="flex flex-wrap items-center gap-3 text-sm">
-                      <Link to={selectedDeckPresentation.sharePath} className="rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-600 transition-colors hover:bg-rose-100 hover:text-link-light">
+                      <Link to={selectedDeckPresentation.sharePath} className="break-all rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-rose-100 hover:text-link-light sm:text-sm">
                         {selectedDeckPresentation.sharePath}
                       </Link>
                       {selectedDeckPresentation.state === 'active' && (
@@ -626,7 +626,7 @@ export default function CourseDeckPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-50 to-orange-50 p-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-50 to-orange-50 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-link-light">{'\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u043E\u0445\u043E\u0436\u0434\u0435\u043D\u0438\u044F'}</p>
                     <p className="mt-2 text-base text-slate-600">
@@ -637,7 +637,7 @@ export default function CourseDeckPage() {
                     type="button"
                     onClick={handleStartStudy}
                     disabled={!canStartStudy}
-                    className="rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-2xl bg-link-light px-5 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     {'\u041D\u0430\u0447\u0430\u0442\u044C \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u0435'}
                   </button>

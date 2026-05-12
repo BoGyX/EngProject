@@ -178,14 +178,14 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
 
     return (
       <div
-        className={`space-y-4 rounded-2xl border px-5 py-4 text-left ${
+        className={`space-y-4 rounded-2xl border px-4 py-4 text-left sm:px-5 ${
           feedback.correct ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'
         }`}
       >
         <p className="text-sm font-semibold leading-6">{feedback.text}</p>
 
         {feedback.submittedAnswer && (
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1 break-words text-sm">
             <p>
               <span className="font-semibold">Ваш ответ:</span> {feedback.submittedAnswer}
             </p>
@@ -205,7 +205,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
           <button
             type="button"
             onClick={advanceToNextCard}
-            className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark"
+            className="w-full rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark sm:w-auto"
           >
             Далее
           </button>
@@ -221,7 +221,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
           <div className="space-y-6 text-center">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <h2 className="text-4xl font-bold text-text-light">{card.word}</h2>
+                <h2 className="text-3xl font-bold text-text-light sm:text-4xl">{card.word}</h2>
                 {card.audio_url && (
                   <button
                     type="button"
@@ -233,8 +233,8 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                   </button>
                 )}
               </div>
-              {card.phonetic && <p className="text-lg text-gray-400">[{card.phonetic}]</p>}
-              <p className="text-2xl font-medium text-gray-700">{card.translation}</p>
+              {card.phonetic && <p className="text-base text-gray-400 sm:text-lg">[{card.phonetic}]</p>}
+              <p className="text-xl font-medium text-gray-700 sm:text-2xl">{card.translation}</p>
               {card.example && <p className="text-sm italic text-gray-500">{card.example}</p>}
             </div>
 
@@ -243,7 +243,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 type="button"
                 onClick={() => void submitAnswer('viewed')}
                 disabled={submitting}
-                className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+                className="w-full rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50 sm:w-auto"
               >
                 Понял, дальше
               </button>
@@ -258,7 +258,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
           <div className="space-y-6 text-center">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <h2 className="text-4xl font-bold text-text-light">{card.word}</h2>
+                <h2 className="text-3xl font-bold text-text-light sm:text-4xl">{card.word}</h2>
                 {card.audio_url && (
                   <button
                     type="button"
@@ -270,7 +270,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                   </button>
                 )}
               </div>
-              {card.phonetic && <p className="text-lg text-gray-400">[{card.phonetic}]</p>}
+              {card.phonetic && <p className="text-base text-gray-400 sm:text-lg">[{card.phonetic}]</p>}
             </div>
 
             <div className="grid gap-3">
@@ -284,7 +284,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                     type="button"
                     onClick={() => void submitAnswer(option)}
                     disabled={submitting || hasPendingAdvance}
-                    className={`rounded-lg border-2 px-5 py-4 text-left text-lg font-medium transition-all disabled:opacity-70 ${
+                    className={`rounded-lg border-2 px-4 py-4 text-left text-base font-medium transition-all disabled:opacity-70 sm:px-5 sm:text-lg ${
                       isCorrectOption
                         ? 'border-green-300 bg-green-50 text-green-800'
                         : isSelectedWrong
@@ -310,10 +310,10 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 <img
                   src={config.getFullUrl(card.image_url)}
                   alt={card.word}
-                  className="h-64 w-full rounded-xl object-cover"
+                  className="h-56 w-full rounded-xl object-cover sm:h-64"
                 />
               ) : (
-                <div className="flex h-64 w-full items-center justify-center rounded-xl bg-gray-100 text-gray-400">
+                <div className="flex h-56 w-full items-center justify-center rounded-xl bg-gray-100 text-gray-400 sm:h-64">
                   Нет картинки
                 </div>
               )}
@@ -322,7 +322,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 <button
                   type="button"
                   onClick={() => playAudio(card.audio_url)}
-                  className="absolute right-3 top-3 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/80 bg-white/90 text-2xl text-link-light shadow-lg transition-transform hover:scale-105"
+                  className="absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/90 text-xl text-link-light shadow-lg transition-transform hover:scale-105 sm:h-12 sm:w-12 sm:text-2xl"
                   title="Прослушать слово"
                 >
                   <span aria-hidden="true">🔊</span>
@@ -343,7 +343,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                   }
                 }}
                 disabled={hasPendingAdvance}
-                className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-xl focus:border-link-light focus:outline-none disabled:bg-gray-100"
+                className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-lg focus:border-link-light focus:outline-none disabled:bg-gray-100 sm:text-xl"
                 placeholder="Введите английское слово"
                 autoFocus
               />
@@ -352,7 +352,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                   type="button"
                   onClick={() => void submitAnswer(textAnswer)}
                   disabled={!textAnswer.trim() || submitting}
-                  className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+                  className="w-full rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50 sm:w-auto"
                 >
                   Проверить
                 </button>
@@ -367,7 +367,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
         return (
           <div className="space-y-6 text-center">
             <div className="space-y-3">
-              <p className="text-3xl font-medium text-gray-700">{card.translation}</p>
+              <p className="text-2xl font-medium text-gray-700 sm:text-3xl">{card.translation}</p>
               {card.example && <p className="text-sm italic text-gray-500">{card.example}</p>}
             </div>
 
@@ -381,7 +381,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 }
               }}
               disabled={hasPendingAdvance}
-              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-xl focus:border-link-light focus:outline-none disabled:bg-gray-100"
+              className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-lg focus:border-link-light focus:outline-none disabled:bg-gray-100 sm:text-xl"
               placeholder="Введите слово на английском"
               autoFocus
             />
@@ -391,7 +391,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 type="button"
                 onClick={() => void submitAnswer(textAnswer)}
                 disabled={!textAnswer.trim() || submitting}
-                className="rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50"
+                className="w-full rounded-lg bg-link-light px-6 py-3 font-semibold text-white transition-colors hover:bg-link-dark disabled:opacity-50 sm:w-auto"
               >
                 Проверить
               </button>
@@ -405,7 +405,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
         return (
           <div className="space-y-6 text-center">
             <div className="space-y-2">
-              <p className="text-3xl font-medium text-gray-700">{card.translation}</p>
+              <p className="text-2xl font-medium text-gray-700 sm:text-3xl">{card.translation}</p>
               {card.phonetic && <p className="text-sm text-gray-400">[{card.phonetic}]</p>}
             </div>
 
@@ -425,7 +425,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                         setConstructorPool([...constructorPool, removed])
                       }}
                       disabled={hasPendingAdvance}
-                      className="rounded-lg border-2 border-link-light bg-white px-4 py-2 text-2xl font-bold text-link-light disabled:opacity-70"
+                      className="rounded-lg border-2 border-link-light bg-white px-3 py-2 text-xl font-bold text-link-light disabled:opacity-70 sm:px-4 sm:text-2xl"
                     >
                       {letter}
                     </button>
@@ -446,14 +446,14 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                     setConstructorPool(nextPool)
                   }}
                   disabled={hasPendingAdvance}
-                  className="rounded-lg border-2 border-gray-300 bg-white px-4 py-2 text-2xl font-bold text-text-light disabled:opacity-70"
+                  className="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 text-xl font-bold text-text-light disabled:opacity-70 sm:px-4 sm:text-2xl"
                 >
                   {letter}
                 </button>
               ))}
             </div>
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={() => {
@@ -488,15 +488,15 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-card-light shadow-2xl">
-        <div className="border-b border-gray-200 p-5">
-          <div className="flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-card-light shadow-2xl sm:max-h-[92vh] sm:max-w-4xl sm:rounded-2xl">
+        <div className="border-b border-gray-200 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-text-light">{course.title}</h2>
+              <h2 className="text-xl font-bold text-text-light sm:text-2xl">{course.title}</h2>
               <p className="text-sm text-gray-500">{deck.title}</p>
               <div className="space-y-1">
-                <div className="flex items-center justify-between gap-4 text-sm text-gray-500">
+                <div className="flex items-center justify-between gap-4 text-xs text-gray-500 sm:text-sm">
                   <span>Общий прогресс сессии</span>
                   <span className="font-semibold text-link-light">{progressValue}%</span>
                 </div>
@@ -505,13 +505,13 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
                 </div>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="text-3xl text-gray-400 transition-colors hover:text-gray-600">
+            <button type="button" onClick={onClose} className="self-end text-3xl text-gray-400 transition-colors hover:text-gray-600 sm:self-auto">
               ×
             </button>
           </div>
         </div>
 
-        <div className="max-h-[calc(92vh-160px)] overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:max-h-[calc(92vh-160px)] sm:p-8">
           {loading ? (
             <div className="py-20 text-center text-text-light">Подготавливаю сессию...</div>
           ) : !session ? (
@@ -532,7 +532,7 @@ export default function StudySessionModal({ course, deck, onClose }: StudySessio
             </div>
           ) : !currentCard ? (
             <div className="space-y-4 py-16 text-center">
-              <p className="text-2xl font-bold text-text-light">Сессия завершена</p>
+              <p className="text-xl font-bold text-text-light sm:text-2xl">Сессия завершена</p>
               <p className="text-gray-500">Все слова в этой подборке пройдены.</p>
               <button
                 type="button"

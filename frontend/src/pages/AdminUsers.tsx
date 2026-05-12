@@ -248,7 +248,7 @@ export default function AdminUsers() {
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 shadow-xl">
-        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:p-8">
+        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:p-8">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-link-light shadow-sm">
@@ -274,7 +274,7 @@ export default function AdminUsers() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
+      <section className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
         <div className="relative">
           <input
             type="text"
@@ -307,7 +307,7 @@ export default function AdminUsers() {
           </div>
         ) : (
           currentUsers.map((item) => (
-            <article key={item.id} className="rounded-[28px] border border-gray-200 bg-card-light p-6 shadow-md">
+            <article key={item.id} className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -329,7 +329,7 @@ export default function AdminUsers() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   {item.role !== 'admin' && (
                     <button
                       onClick={() => handleChangeRole(item.id, 'admin')}

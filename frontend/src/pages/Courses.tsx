@@ -43,16 +43,16 @@ function CourseCard({ course, userCourse }: CourseCardProps) {
         <img
           src={config.getFullUrl(course.image_url)}
           alt={course.title}
-          className="h-48 w-full object-cover"
+          className="h-44 w-full object-cover sm:h-48"
           onError={(event) => {
             ;(event.target as HTMLImageElement).style.display = 'none'
           }}
         />
       )}
 
-      <div className="p-6">
+      <div className="p-5 sm:p-6">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="text-xl font-semibold text-text-light">{course.title}</h2>
+          <h2 className="text-lg font-semibold text-text-light sm:text-xl">{course.title}</h2>
           {progress >= 100 ? (
             <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">100% завершено</span>
           ) : progress > 0 ? (
@@ -74,7 +74,7 @@ function CourseCard({ course, userCourse }: CourseCardProps) {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-xs text-gray-500">{new Date(course.created_at).toLocaleDateString('ru-RU')}</span>
           <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Опубликован</span>
         </div>
@@ -122,7 +122,7 @@ export default function Courses() {
 
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold text-text-light">Курсы</h1>
+      <h1 className="mb-6 text-2xl font-bold text-text-light sm:text-3xl">Курсы</h1>
 
       {courses.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-card-light p-6 shadow-md">

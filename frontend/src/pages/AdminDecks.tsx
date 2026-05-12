@@ -336,7 +336,7 @@ export default function AdminDecks() {
         <div className="py-8 text-center text-text-light">Загрузка...</div>
       ) : (
         <>
-          <div className="mb-6 flex flex-col gap-5 rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 p-6 shadow-xl lg:flex-row lg:items-center lg:justify-between lg:p-8">
+          <div className="mb-6 flex flex-col gap-5 rounded-[28px] border border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-50 p-4 shadow-xl sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
             <div>
               <Link to="/admin/courses" className="mb-2 inline-block text-link-light transition-colors hover:text-link-dark">
                 ← Назад к курсам
@@ -412,7 +412,7 @@ export default function AdminDecks() {
                   }
                   className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:border-link-light focus:outline-none focus:ring-2 focus:ring-link-light"
                 />
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <button type="submit" className="rounded-2xl bg-accent-light px-5 py-3 text-white transition-colors hover:bg-accent-dark">
                     {editingDeck ? 'Сохранить' : 'Создать'}
                   </button>
@@ -537,7 +537,7 @@ export default function AdminDecks() {
                     </h3>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <div className="relative flex-1">
                       <input
                         type="text"
@@ -615,7 +615,7 @@ export default function AdminDecks() {
                     />
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <button type="submit" className="rounded-2xl bg-accent-light px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-dark">
                       {editingCard ? 'Сохранить карточку' : 'Создать карточку'}
                     </button>

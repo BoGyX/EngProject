@@ -601,7 +601,7 @@ export default function ReaderTextPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 to-orange-100">
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 shadow-md backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -633,7 +633,7 @@ export default function ReaderTextPage() {
                   </span>
                 )}
               </div>
-              <h1 className="mt-2 whitespace-pre-line text-2xl font-bold text-gray-800">{normalizedTitle}</h1>
+              <h1 className="mt-2 whitespace-pre-line text-xl font-bold text-gray-800 sm:text-2xl">{normalizedTitle}</h1>
             </div>
           </div>
 
@@ -668,14 +668,14 @@ export default function ReaderTextPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-4 sm:px-6 sm:py-8 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
-          <div className="rounded-[28px] bg-white p-8 shadow-xl">
+          <div className="rounded-[28px] bg-white p-5 shadow-xl sm:p-8">
             <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-sm text-slate-600">
               Нажимайте по словам, чтобы увидеть перевод, прослушать произношение, добавить слово в текущий активный дек и
               сохранить свой личный перевод, который виден только вам.
             </div>
-            <div className="prose max-w-none text-lg leading-10 text-gray-800">{renderInteractiveText(normalizedContent)}</div>
+            <div className="prose max-w-none text-base leading-8 text-gray-800 sm:text-lg sm:leading-10">{renderInteractiveText(normalizedContent)}</div>
           </div>
 
           {readerMessage && (
