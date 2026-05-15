@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"english-learning/internal/services"
+	"fmt"
 	"net/http"
+	neturl "net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +34,7 @@ type GetWordInfoResponse struct {
 
 // GetWordInfo returns dictionary data for the admin card form.
 func (h *DictionaryHandler) GetWordInfo(c *gin.Context) {
-	word := c.Param("word")
+	word := strings.TrimSpace(c.Param("word"))
 	if word == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "word is required"})
 		return
@@ -58,6 +61,9 @@ func (h *DictionaryHandler) GetWordInfo(c *gin.Context) {
 				response.AudioURL = phonetic.Audio
 				break
 			}
+		}
+		if response.AudioURL == "" {
+			response.AudioURL = fmt.Sprintf("https://api.dictionaryapi.dev/media/pronunciations/en/%s-us.mp3", neturl.PathEscape(strings.ToLower(word)))
 		}
 
 		if len(entry.Meanings) > 0 && len(entry.Meanings[0].Definitions) > 0 {

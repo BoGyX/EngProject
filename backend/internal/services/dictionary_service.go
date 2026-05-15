@@ -6,13 +6,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
+	"strings"
+	"sync"
 	"time"
 )
 
 // DictionaryService сервис для работы с Free Dictionary API
 type DictionaryService struct {
-	baseURL string
-	client  *http.Client
+	baseURL          string
+	client           *http.Client
+	mu               sync.RWMutex
+	wordInfoCache    map[string]*DictionaryEntry
+	translationCache map[string]string
 }
 
 // DictionaryEntry представляет ответ от Dictionary API
@@ -56,19 +62,34 @@ func NewDictionaryService() *DictionaryService {
 	return &DictionaryService{
 		baseURL: "https://api.dictionaryapi.dev/api/v2/entries/en",
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 6 * time.Second,
 		},
+		wordInfoCache:    make(map[string]*DictionaryEntry),
+		translationCache: make(map[string]string),
 	}
+}
+
+func normalizeDictionaryWord(word string) string {
+	return strings.ToLower(strings.TrimSpace(word))
 }
 
 // GetWordInfo получает информацию о слове из Dictionary API
 func (s *DictionaryService) GetWordInfo(word string) (*DictionaryEntry, error) {
-	if word == "" {
+	normalizedWord := normalizeDictionaryWord(word)
+	if normalizedWord == "" {
 		return nil, errors.New("слово не может быть пустым")
 	}
 
 	// Формируем URL
-	url := fmt.Sprintf("%s/%s", s.baseURL, word)
+	s.mu.RLock()
+	cachedEntry := s.wordInfoCache[normalizedWord]
+	s.mu.RUnlock()
+	if cachedEntry != nil {
+		entryCopy := *cachedEntry
+		return &entryCopy, nil
+	}
+
+	url := fmt.Sprintf("%s/%s", s.baseURL, neturl.PathEscape(normalizedWord))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -76,6 +97,7 @@ func (s *DictionaryService) GetWordInfo(word string) (*DictionaryEntry, error) {
 	}
 
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "english-learning/1.0")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -112,6 +134,10 @@ func (s *DictionaryService) GetWordInfo(word string) (*DictionaryEntry, error) {
 	}
 
 	// Возвращаем первую запись
+	s.mu.Lock()
+	s.wordInfoCache[normalizedWord] = &entries[0]
+	s.mu.Unlock()
+
 	return &entries[0], nil
 }
 
@@ -199,12 +225,78 @@ type MyMemoryTranslationResponse struct {
 
 // TranslateToRussian переводит английское слово на русский
 func (s *DictionaryService) TranslateToRussian(word string) (string, error) {
-	if word == "" {
+	normalizedWord := normalizeDictionaryWord(word)
+	if normalizedWord == "" {
 		return "", errors.New("слово не может быть пустым")
 	}
 
 	// Сначала проверяем встроенный словарь для популярных слов
+	s.mu.RLock()
+	cachedTranslation := s.translationCache[normalizedWord]
+	s.mu.RUnlock()
+	if cachedTranslation != "" {
+		return cachedTranslation, nil
+	}
+
 	translations := map[string]string{
+		"hello": "привет",
+		"hi": "привет",
+		"goodbye": "до свидания",
+		"bye": "пока",
+		"morning": "утро",
+		"afternoon": "день",
+		"evening": "вечер",
+		"night": "ночь",
+		"please": "пожалуйста",
+		"thanks": "спасибо",
+		"thank": "благодарить",
+		"sorry": "извините",
+		"yes": "да",
+		"no": "нет",
+		"i": "я",
+		"a": "неопределенный артикль",
+		"an": "неопределенный артикль",
+		"you": "ты, вы",
+		"he": "он",
+		"she": "она",
+		"they": "они",
+		"letter": "буква",
+		"word": "слово",
+		"two": "два",
+		"three": "три",
+		"four": "четыре",
+		"five": "пять",
+		"six": "шесть",
+		"seven": "семь",
+		"eight": "восемь",
+		"nine": "девять",
+		"ten": "десять",
+		"dog": "собака",
+		"cat": "кошка",
+		"frog": "лягушка",
+		"banana": "банан",
+		"apple": "яблоко",
+		"school": "школа",
+		"teacher": "учитель",
+		"student": "студент, ученик",
+		"girl": "девочка",
+		"boy": "мальчик",
+		"man": "мужчина",
+		"woman": "женщина",
+		"young": "молодой",
+		"old": "старый",
+		"tall": "высокий",
+		"short": "низкий, короткий",
+		"slim": "стройный",
+		"thin": "тонкий, худой",
+		"fat": "полный, толстый",
+		"beautiful": "красивый",
+		"handsome": "красивый",
+		"pretty": "симпатичный",
+		"ugly": "некрасивый",
+		"hair": "волосы",
+		"face": "лицо",
+		"eye": "глаз",
 		"the": "определенный артикль",
 		"power": "сила, мощь, власть",
 		"of": "предлог 'из', 'от'",
@@ -343,12 +435,15 @@ func (s *DictionaryService) TranslateToRussian(word string) (string, error) {
 	}
 
 	// Проверяем встроенный словарь
-	if translation, ok := translations[word]; ok {
+	if translation, ok := translations[normalizedWord]; ok {
+		s.mu.Lock()
+		s.translationCache[normalizedWord] = translation
+		s.mu.Unlock()
 		return translation, nil
 	}
 
 	// Если слова нет в словаре, используем MyMemory Translation API
-	url := fmt.Sprintf("https://api.mymemory.translated.net/get?q=%s&langpair=en|ru", word)
+	url := fmt.Sprintf("https://api.mymemory.translated.net/get?q=%s&langpair=en|ru", neturl.QueryEscape(normalizedWord))
 	
 	println("Requesting translation for:", word, "URL:", url)
 	
@@ -396,5 +491,14 @@ func (s *DictionaryService) TranslateToRussian(word string) (string, error) {
 		return "", errors.New("перевод не найден")
 	}
 
-	return translationResp.ResponseData.TranslatedText, nil
+	translatedText := strings.TrimSpace(translationResp.ResponseData.TranslatedText)
+	if translatedText == "" {
+		return "", errors.New("перевод не найден")
+	}
+
+	s.mu.Lock()
+	s.translationCache[normalizedWord] = translatedText
+	s.mu.Unlock()
+
+	return translatedText, nil
 }
