@@ -57,13 +57,10 @@ func (h *DictionaryHandler) GetWordInfo(c *gin.Context) {
 		}
 
 		for _, phonetic := range entry.Phonetics {
-			if phonetic.Audio != "" {
-				response.AudioURL = phonetic.Audio
+			if audioURL := normalizeDictionaryAudioURL(phonetic.Audio); audioURL != "" {
+				response.AudioURL = audioURL
 				break
 			}
-		}
-		if response.AudioURL == "" {
-			response.AudioURL = fmt.Sprintf("https://api.dictionaryapi.dev/media/pronunciations/en/%s-us.mp3", neturl.PathEscape(strings.ToLower(word)))
 		}
 
 		if len(entry.Meanings) > 0 && len(entry.Meanings[0].Definitions) > 0 {
@@ -88,5 +85,28 @@ func (h *DictionaryHandler) GetWordInfo(c *gin.Context) {
 		response.Translation = "Перевод не найден"
 	}
 
+	if response.AudioURL == "" {
+		response.AudioURL = defaultDictionaryAudioURL(word)
+	}
+
 	c.JSON(http.StatusOK, response)
+}
+
+func normalizeDictionaryAudioURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(value, "//") {
+		return "https:" + value
+	}
+	return value
+}
+
+func defaultDictionaryAudioURL(word string) string {
+	normalizedWord := strings.ToLower(strings.TrimSpace(word))
+	if normalizedWord == "" {
+		return ""
+	}
+	return fmt.Sprintf("https://api.dictionaryapi.dev/media/pronunciations/en/%s-us.mp3", neturl.PathEscape(normalizedWord))
 }

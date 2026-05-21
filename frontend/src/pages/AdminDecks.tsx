@@ -196,7 +196,7 @@ export default function AdminDecks() {
         return {
           ...current,
           translation: overwrite || !current.translation ? info.translation || current.translation : current.translation,
-          audio_url: overwrite || !current.audio_url ? info.audio_url || current.audio_url : current.audio_url,
+          audio_url: overwrite || !current.audio_url ? normalizeApiAudioUrl(info.audio_url) || current.audio_url : current.audio_url,
         }
       })
     } catch (error) {
@@ -232,6 +232,14 @@ export default function AdminDecks() {
   const normalizeOptionalValue = (value: string) => {
     const trimmed = value.trim()
     return trimmed === '' ? undefined : trimmed
+  }
+
+  const normalizeApiAudioUrl = (value?: string) => {
+    const trimmed = value?.trim() || ''
+    if (!trimmed) {
+      return ''
+    }
+    return trimmed.startsWith('//') ? `https:${trimmed}` : trimmed
   }
 
   const handleCreateCard = async (event: React.FormEvent) => {
