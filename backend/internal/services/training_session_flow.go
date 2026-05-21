@@ -89,6 +89,12 @@ func (s *TrainingSessionService) GetTrainingSessionStateByID(id int64, userID *u
 		return nil, err
 	}
 
+	if userID != nil {
+		if err := s.applyPersonalTranslationsToSessionCards(*userID, cards); err != nil {
+			return nil, err
+		}
+	}
+
 	var currentCard *models.TrainingSessionCardState
 	remaining := 0
 	for index := range cards {
@@ -215,6 +221,9 @@ func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID 
 
 	card, err := s.cardService.GetCardByID(sessionCard.CardID)
 	if err != nil {
+		return nil, false, err
+	}
+	if err := s.applyPersonalTranslationToCard(userID, card); err != nil {
 		return nil, false, err
 	}
 
@@ -1325,4 +1334,45 @@ func getUnfinishedTrainingModes(userCard *models.UserCard, card *models.Card) []
 	}
 
 	return unfinished
+}
+
+func (s *TrainingSessionService) applyPersonalTranslationsToSessionCards(userID uuid.UUID, cards []models.TrainingSessionCardState) error {
+	if s.personalTranslationService == nil || len(cards) == 0 {
+		return nil
+	}
+
+	words := make([]string, 0, len(cards))
+	for _, card := range cards {
+		words = append(words, card.Word)
+	}
+
+	translationMap, err := s.personalTranslationService.GetLatestTranslationMap(userID, words)
+	if err != nil {
+		return err
+	}
+
+	for index := range cards {
+		if translation, exists := translationMap[normalizePersonalTranslationWord(cards[index].Word)]; exists {
+			cards[index].Translation = translation
+		}
+	}
+
+	return nil
+}
+
+func (s *TrainingSessionService) applyPersonalTranslationToCard(userID uuid.UUID, card *models.Card) error {
+	if s.personalTranslationService == nil || card == nil {
+		return nil
+	}
+
+	translationMap, err := s.personalTranslationService.GetLatestTranslationMap(userID, []string{card.Word})
+	if err != nil {
+		return err
+	}
+
+	if translation, exists := translationMap[normalizePersonalTranslationWord(card.Word)]; exists {
+		card.Translation = translation
+	}
+
+	return nil
 }

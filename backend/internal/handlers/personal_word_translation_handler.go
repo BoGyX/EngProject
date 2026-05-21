@@ -80,9 +80,6 @@ func (h *PersonalWordTranslationHandler) CreatePersonalTranslation(c *gin.Contex
 		case "word and translation are required":
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
-		case "personal translation already exists":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

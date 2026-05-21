@@ -11,6 +11,7 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     name TEXT,
+    moodle_login TEXT UNIQUE,
     role TEXT CHECK(role IN ('user','admin')) DEFAULT 'user',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()

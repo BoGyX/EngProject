@@ -4,6 +4,7 @@ import (
 	"context"
 	"english-learning/internal/models"
 	"errors"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -125,6 +126,75 @@ func (s *CourseAccessService) EnsureUserHasAccess(userID uuid.UUID, courseID int
 		return errors.New("course access denied")
 	}
 	return nil
+}
+
+func (s *CourseAccessService) ReplaceUserCourseAccess(userID uuid.UUID, courseIDs []int64, grantedBy *uuid.UUID) ([]int64, error) {
+	normalized := normalizeCourseIDs(courseIDs)
+	ctx := context.Background()
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	if len(normalized) == 0 {
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM course_accesses
+			 WHERE user_id = $1`,
+			userID,
+		); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM course_accesses
+			 WHERE user_id = $1
+			   AND NOT (course_id = ANY($2::bigint[]))`,
+			userID, normalized,
+		); err != nil {
+			return nil, err
+		}
+
+		for _, courseID := range normalized {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO course_accesses (user_id, course_id, granted_by)
+				 VALUES ($1, $2, $3)
+				 ON CONFLICT (user_id, course_id)
+				 DO UPDATE SET granted_by = EXCLUDED.granted_by`,
+				userID, courseID, grantedBy,
+			); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return normalized, nil
+}
+
+func normalizeCourseIDs(courseIDs []int64) []int64 {
+	unique := make(map[int64]struct{}, len(courseIDs))
+	for _, courseID := range courseIDs {
+		if courseID <= 0 {
+			continue
+		}
+		unique[courseID] = struct{}{}
+	}
+
+	normalized := make([]int64, 0, len(unique))
+	for courseID := range unique {
+		normalized = append(normalized, courseID)
+	}
+
+	sort.Slice(normalized, func(i, j int) bool {
+		return normalized[i] < normalized[j]
+	})
+
+	return normalized
 }
 
 func (s *CourseAccessService) GrantCourseAccess(userID uuid.UUID, courseID int64, grantedBy *uuid.UUID) (*models.CourseAccess, error) {

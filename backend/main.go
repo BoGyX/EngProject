@@ -168,7 +168,7 @@ func main() {
 	userCourseService := services.NewUserCourseService(db)
 	userDeckService := services.NewUserDeckService(db)
 	userCardService := services.NewUserCardService(db)
-	trainingSessionService := services.NewTrainingSessionService(db, cardService, userDeckService, userCardService)
+	trainingSessionService := services.NewTrainingSessionService(db, cardService, userDeckService, userCardService, personalTranslationService)
 	dictionaryService := services.NewDictionaryService()
 	readingTextService := services.NewReadingTextService(db)
 
@@ -221,7 +221,7 @@ func main() {
 	)
 	courseHandler := handlers.NewCourseHandler(courseService, deckService, cardService, dictionaryService, courseAccessService)
 	deckHandler := handlers.NewDeckHandler(deckService, courseService, courseAccessService)
-	cardHandler := handlers.NewCardHandler(cardService, userDeckService, deckService, courseService, courseAccessService)
+	cardHandler := handlers.NewCardHandler(cardService, userDeckService, deckService, courseService, courseAccessService, personalTranslationService)
 	vocabHandler := handlers.NewPersonalVocabularyHandler(vocabService)
 	personalTranslationHandler := handlers.NewPersonalWordTranslationHandler(personalTranslationService)
 	userCourseHandler := handlers.NewUserCourseHandler(userCourseService)
@@ -315,7 +315,7 @@ func main() {
 
 		// Courses endpoints (публичные - только чтение)
 		// Используем OptionalAuth чтобы админы видели все курсы, а пользователи - только опубликованные
-        api.GET("/courses", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAllCourses)
+		api.GET("/courses", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAllCourses)
 		api.GET("/courses/by-slug/:slug", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseBySlug)
 		api.GET("/courses/:id", middleware.OptionalAuth(cfg.JWT.Secret), courseHandler.GetAccessibleCourseByID)
 
@@ -412,8 +412,11 @@ func main() {
 		{
 			// Admin Users
 			admin.GET("/users", userHandler.GetAllUsers)
+			admin.POST("/users", userHandler.CreateManagedUser)
 			admin.PUT("/users/:id/role", userHandler.UpdateUserRole)
 			admin.GET("/users/course-accesses", userHandler.GetAllCourseAccesses)
+			admin.GET("/users/:id/course-access", userHandler.GetUserCourseAccess)
+			admin.PUT("/users/:id/course-access", userHandler.UpdateUserCourseAccess)
 			admin.POST("/users/:id/course-accesses/:course_id", userHandler.GrantCourseAccess)
 			admin.DELETE("/users/:id/course-accesses/:course_id", userHandler.RevokeCourseAccess)
 

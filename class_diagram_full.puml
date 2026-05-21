@@ -1,0 +1,548 @@
+@startuml English Learning Platform - Class Diagram
+
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+title English Learning Platform - Class Diagram
+
+' ===================================
+' MODELS (Сущности данных)
+' ===================================
+package "Models" {
+    
+    class User {
+        - id: UUID
+        - email: string
+        - name: *string
+        - role: string
+        - roleID: int
+        - createdAt: time.Time
+        - updatedAt: time.Time
+        + GetRoleID(): int
+        + SetRoleID(roleID: int)
+    }
+    
+    class Course {
+        - id: int64
+        - title: string
+        - slug: string
+        - description: *string
+        - imageURL: *string
+        - isPublished: bool
+        - createdBy: *UUID
+        - createdAt: time.Time
+    }
+    
+    class Deck {
+        - id: int64
+        - courseID: int64
+        - title: string
+        - slug: string
+        - description: *string
+        - position: int
+        - createdAt: time.Time
+    }
+    
+    class Card {
+        - id: int64
+        - deckID: int64
+        - position: int
+        - word: string
+        - translation: string
+        - phonetic: *string
+        - audioURL: *string
+        - imageURL: *string
+        - example: *string
+        - createdBy: *UUID
+        - isCustom: bool
+        - createdAt: time.Time
+    }
+    
+    class UserCourse {
+        - id: int64
+        - userID: UUID
+        - courseID: int64
+        - startedAt: time.Time
+        - lastOpenedAt: *time.Time
+        - completedAt: *time.Time
+        - isActive: bool
+        - attemptNumber: int
+        - completedDecksCount: int
+        - totalDecksCount: int
+        - progressPercentage: float64
+    }
+    
+    class UserDeck {
+        - id: int64
+        - userID: UUID
+        - deckID: int64
+        - userCourseID: *int64
+        - status: string
+        - learnedCardsCount: int
+        - totalCardsCount: int
+        - progressPercentage: float64
+        - startedAt: *time.Time
+        - lastOpenedAt: *time.Time
+        - completedAt: *time.Time
+        - isActive: bool
+        - createdAt: time.Time
+        - updatedAt: time.Time
+    }
+    
+    class UserCard {
+        - id: int64
+        - userID: UUID
+        - cardID: int64
+        - userDeckID: *int64
+        - status: string
+        - correctCount: int
+        - wrongCount: int
+        - lastSeen: *time.Time
+        - nextReview: *time.Time
+        - modeView: bool
+        - modeChoice: bool
+        - modeWithPhoto: bool
+        - modeWithoutPhoto: bool
+        - modeRussian: bool
+        - modeConstructor: bool
+        - currentMode: string
+        - progressPercentage: int
+        - createdAt: time.Time
+        - updatedAt: time.Time
+    }
+    
+    class TrainingSession {
+        - id: int64
+        - userID: *UUID
+        - courseID: *int64
+        - deckID: *int64
+        - userDeckID: *int64
+        - startedAt: time.Time
+        - finishedAt: *time.Time
+    }
+    
+    class TrainingSessionCard {
+        - id: int64
+        - sessionID: int64
+        - cardID: int64
+        - sequenceNumber: int
+        - currentMode: string
+        - progressPercentage: int
+        - isCompleted: bool
+        - lastAnswerCorrect: *bool
+        - correctAnswers: int
+        - wrongAnswers: int
+        - createdAt: time.Time
+        - updatedAt: time.Time
+    }
+    
+    class TrainingAnswer {
+        - id: int64
+        - sessionID: int64
+        - cardID: *int64
+        - isCorrect: *bool
+        - answeredAt: time.Time
+    }
+    
+    class PersonalVocabulary {
+        - id: int64
+        - userID: UUID
+        - word: string
+        - translation: string
+        - phonetic: *string
+        - audioURL: *string
+        - example: *string
+        - notes: *string
+        - tags: []string
+        - status: string
+        - correctCount: int
+        - wrongCount: int
+        - lastSeen: *time.Time
+        - nextReview: *time.Time
+        - createdAt: time.Time
+        - updatedAt: time.Time
+    }
+    
+    class PersonalWordTranslation {
+        - id: int64
+        - userID: UUID
+        - word: string
+        - translation: string
+        - createdAt: time.Time
+        - updatedAt: time.Time
+    }
+    
+    class ReadingText {
+        - id: int64
+        - userID: UUID
+        - courseID: int64
+        - courseTitle: string
+        - courseSlug: string
+        - title: string
+        - content: string
+        - audioURL: string
+        - createdAt: time.Time
+        - updatedAt: time.Time
+    }
+    
+    class RefreshToken {
+        - id: int64
+        - userID: *UUID
+        - token: string
+        - expiresAt: time.Time
+        - createdAt: time.Time
+    }
+    
+    class CourseAccess {
+        - userID: UUID
+        - courseID: int64
+        - grantedBy: *UUID
+        - createdAt: time.Time
+    }
+}
+
+' ===================================
+' SERVICES (Бизнес-логика)
+' ===================================
+package "Services" {
+    
+    class UserService {
+        - db: *pgxpool.Pool
+        + GetAllUsers(): ([]User, error)
+        + GetUserByID(userID: UUID): (*User, error)
+        + GetUserByEmail(email: string): (*User, error)
+        + CreateUser(email, password, name: string): (*User, error)
+        + CreateAdmin(email, password, name: string): (*User, error)
+        + Authenticate(email, password: string): (*User, error)
+        + SaveRefreshToken(userID: UUID, token: string, expiry: Duration): error
+        + ValidateRefreshToken(token: string): (UUID, error)
+        + DeleteRefreshToken(token: string): error
+        + UpdateUserRole(userID: UUID, role: string): error
+    }
+    
+    class CourseService {
+        - db: *pgxpool.Pool
+        + GetAllCourses(): ([]Course, error)
+        + GetPublishedCourses(): ([]Course, error)
+        + GetCourseByID(courseID: int64): (*Course, error)
+        + GetCourseBySlug(slug: string): (*Course, error)
+        + CreateCourse(...): (*Course, error)
+        + UpdateCourse(...): (*Course, error)
+        + DeleteCourse(courseID: int64): error
+    }
+    
+    class DeckService {
+        - db: *pgxpool.Pool
+        + GetAllDecks(): ([]Deck, error)
+        + GetDeckByID(deckID: int64): (*Deck, error)
+        + GetDecksByCourseID(courseID: int64): ([]Deck, error)
+        + GetDeckBySlug(courseSlug, deckSlug: string): (*Deck, error)
+        + CreateDeck(...): (*Deck, error)
+        + UpdateDeck(...): (*Deck, error)
+        + DeleteDeck(deckID: int64): error
+    }
+    
+    class CardService {
+        - db: *pgxpool.Pool
+        + GetAllCards(): ([]Card, error)
+        + GetCardByID(cardID: int64): (*Card, error)
+        + GetCardsByDeckID(deckID: int64): ([]Card, error)
+        + GetCardsByIDs(ids: []int64): ([]Card, error)
+        + CreateCard(...): (*Card, error)
+        + CreateCustomCard(...): (*Card, error)
+        + UpdateCard(...): (*Card, error)
+        + DeleteCard(cardID: int64): error
+    }
+    
+    class UserCourseService {
+        - db: *pgxpool.Pool
+        + GetAllUserCourses(): ([]UserCourse, error)
+        + GetUserCourseByID(id: int64): (*UserCourse, error)
+        + GetUserCoursesByUserID(userID: UUID): ([]UserCourse, error)
+        + StartCourse(...): (*UserCourse, error)
+        + UpdateUserCourse(...): (*UserCourse, error)
+        + DeleteUserCourse(id: int64): error
+    }
+    
+    class UserDeckService {
+        - db: *pgxpool.Pool
+        + GetAllUserDecks(): ([]UserDeck, error)
+        + GetUserDeckByID(id: int64): (*UserDeck, error)
+        + GetUserDecksByUserID(userID: UUID): ([]UserDeck, error)
+        + StartDeck(...): (*UserDeck, error)
+        + UpdateUserDeck(...): (*UserDeck, error)
+        + DeleteUserDeck(id: int64): error
+    }
+    
+    class UserCardService {
+        - db: *pgxpool.Pool
+        + GetAllUserCards(): ([]UserCard, error)
+        + GetUserCardByID(id: int64): (*UserCard, error)
+        + GetUserCardsByUserID(userID: UUID): ([]UserCard, error)
+        + CreateUserCard(...): (*UserCard, error)
+        + UpdateUserCard(...): (*UserCard, error)
+        + DeleteUserCard(id: int64): error
+    }
+    
+    class TrainingSessionService {
+        - db: *pgxpool.Pool
+        - cardService: *CardService
+        - userDeckService: *UserDeckService
+        - userCardService: *UserCardService
+        + GetAllTrainingSessions(): ([]TrainingSession, error)
+        + GetTrainingSessionByID(id: int64): (*TrainingSession, error)
+        + GetTrainingSessionsByUserID(userID: UUID): ([]TrainingSession, error)
+        + StartTrainingSession(...): (*TrainingSession, error)
+        + FinishTrainingSession(id: int64): (*TrainingSession, error)
+        + DeleteTrainingSession(id: int64): error
+    }
+    
+    class PersonalVocabularyService {
+        - db: *pgxpool.Pool
+        + GetAllPersonalVocabulary(): ([]PersonalVocabulary, error)
+        + GetPersonalVocabularyByID(id: int64): (*PersonalVocabulary, error)
+        + CreatePersonalVocabulary(...): (*PersonalVocabulary, error)
+        + UpdatePersonalVocabulary(...): (*PersonalVocabulary, error)
+        + DeletePersonalVocabulary(id: int64): error
+    }
+    
+    class CourseAccessService {
+        - db: *pgxpool.Pool
+        + GetAllCourseAccesses(): ([]CourseAccess, error)
+        + GetAccessibleCoursesByUserID(userID: UUID, includeUnpublished: bool): ([]Course, error)
+        + GrantCourseAccess(...): (*CourseAccess, error)
+        + RevokeCourseAccess(userID: UUID, courseID: int64): error
+    }
+    
+    class MoodleService {
+        - baseURL: string
+        - token: string
+        - service: string
+        + Authenticate(username, password: string): (*MoodleAuthResult, error)
+    }
+    
+    class DictionaryService {
+        + GetWordInfo(word: string): (*WordInfo, error)
+    }
+    
+    class ReadingTextService {
+        - db: *pgxpool.Pool
+        + GetAllReadingTexts(): ([]ReadingText, error)
+        + GetReadingTextByID(id: int64): (*ReadingText, error)
+        + CreateReadingText(...): (*ReadingText, error)
+        + DeleteReadingText(id: int64): error
+    }
+}
+
+' ===================================
+' HANDLERS (HTTP обработчики)
+' ===================================
+package "Handlers" {
+    
+    class AuthHandler {
+        - userService: *UserService
+        - moodleService: *MoodleService
+        - jwtSecret: string
+        - jwtExpiry: int
+        - moodleEnabled: bool
+        - moodleOnlyAuth: bool
+        - moodleAutoCreate: bool
+        + Register(c: *gin.Context)
+        + RegisterAdmin(c: *gin.Context)
+        + Login(c: *gin.Context)
+        + LoginMoodle(c: *gin.Context)
+        + RegisterMoodle(c: *gin.Context)
+        + RefreshToken(c: *gin.Context)
+        + Logout(c: *gin.Context)
+    }
+    
+    class UserHandler {
+        - userService: *UserService
+        - courseAccessService: *CourseAccessService
+        + GetAllUsers(c: *gin.Context)
+        + GetUserByID(c: *gin.Context)
+        + UpdateUserRole(c: *gin.Context)
+        + GetAllCourseAccesses(c: *gin.Context)
+        + GrantCourseAccess(c: *gin.Context)
+        + RevokeCourseAccess(c: *gin.Context)
+    }
+    
+    class CourseHandler {
+        - courseService: *CourseService
+        - deckService: *DeckService
+        - cardService: *CardService
+        - dictionaryService: *DictionaryService
+        - courseAccessService: *CourseAccessService
+        + GetAllCourses(c: *gin.Context)
+        + GetCourseByID(c: *gin.Context)
+        + GetCourseBySlug(c: *gin.Context)
+        + CreateCourse(c: *gin.Context)
+        + UpdateCourse(c: *gin.Context)
+        + DeleteCourse(c: *gin.Context)
+        + PublishCourse(c: *gin.Context)
+    }
+    
+    class DeckHandler {
+        - deckService: *DeckService
+        - courseService: *CourseService
+        - courseAccessService: *CourseAccessService
+        + GetAllDecks(c: *gin.Context)
+        + GetDeckByID(c: *gin.Context)
+        + GetDeckBySlug(c: *gin.Context)
+        + CreateDeck(c: *gin.Context)
+        + UpdateDeck(c: *gin.Context)
+        + DeleteDeck(c: *gin.Context)
+    }
+    
+    class CardHandler {
+        - cardService: *CardService
+        - userDeckService: *UserDeckService
+        - deckService: *DeckService
+        - courseService: *CourseService
+        - courseAccessService: *CourseAccessService
+        + GetAllCards(c: *gin.Context)
+        + GetCardByID(c: *gin.Context)
+        + CreateCard(c: *gin.Context)
+        + CreateCustomCard(c: *gin.Context)
+        + UpdateCard(c: *gin.Context)
+        + DeleteCard(c: *gin.Context)
+    }
+    
+    class TrainingSessionHandler {
+        - trainingSessionService: *TrainingSessionService
+        + GetAllTrainingSessions(c: *gin.Context)
+        + GetTrainingSessionByID(c: *gin.Context)
+        + StartTrainingSession(c: *gin.Context)
+        + FinishTrainingSession(c: *gin.Context)
+        + DeleteTrainingSession(c: *gin.Context)
+        + SubmitAnswer(c: *gin.Context)
+    }
+    
+    class PersonalVocabularyHandler {
+        - vocabService: *PersonalVocabularyService
+        + GetAllPersonalVocabulary(c: *gin.Context)
+        + GetPersonalVocabularyByID(c: *gin.Context)
+        + CreatePersonalVocabulary(c: *gin.Context)
+        + UpdatePersonalVocabulary(c: *gin.Context)
+        + DeletePersonalVocabulary(c: *gin.Context)
+    }
+    
+    class DictionaryHandler {
+        - dictionaryService: *DictionaryService
+        + GetWordInfo(c: *gin.Context)
+    }
+    
+    class UploadHandler {
+        + UploadImage(c: *gin.Context)
+        + UploadAudio(c: *gin.Context)
+        + DeleteFile(c: *gin.Context)
+        + BaseDir(): string
+    }
+    
+    class ReadingTextHandler {
+        - readingTextService: *ReadingTextService
+        + GetAllReadingTexts(c: *gin.Context)
+        + GetReadingTextByID(c: *gin.Context)
+        + CreateReadingText(c: *gin.Context)
+        + DeleteReadingText(c: *gin.Context)
+    }
+}
+
+' ===================================
+' MIDDLEWARE
+' ===================================
+package "Middleware" {
+    class AuthMiddleware {
+        + Auth(jwtSecret: string): gin.HandlerFunc
+    }
+    
+    class OptionalAuthMiddleware {
+        + OptionalAuth(jwtSecret: string): gin.HandlerFunc
+    }
+    
+    class AdminMiddleware {
+        + Admin(): gin.HandlerFunc
+    }
+    
+    class CORSMiddleware {
+        + CORS(): gin.HandlerFunc
+    }
+}
+
+' ===================================
+' RELATIONSHIPS (Связи между моделями)
+' ===================================
+
+' User relationships
+User "1" -- "*" UserCourse : has
+User "1" -- "*" UserDeck : has
+User "1" -- "*" UserCard : has
+User "1" -- "*" TrainingSession : starts
+User "1" -- "*" PersonalVocabulary : owns
+User "1" -- "*" PersonalWordTranslation : owns
+User "1" -- "*" RefreshToken : has
+User "1" -- "*" CourseAccess : granted
+User "1" -- "*" Course : creates
+User "1" -- "*" Card : creates
+User "1" -- "*" ReadingText : owns
+
+' Course relationships
+Course "1" -- "*" Deck : contains
+Course "1" -- "*" UserCourse : enrolled
+Course "1" -- "*" CourseAccess : accessible
+Course "1" -- "*" TrainingSession : uses
+
+' Deck relationships
+Deck "1" -- "*" Card : contains
+Deck "1" -- "*" UserDeck : progresses
+Deck "1" -- "*" TrainingSession : uses
+
+' Card relationships
+Card "1" -- "*" UserCard : tracks
+Card "1" -- "*" TrainingSessionCard : in
+Card "1" -- "*" TrainingAnswer : answers
+
+' TrainingSession relationships
+TrainingSession "1" -- "*" TrainingSessionCard : contains
+TrainingSession "1" -- "*" TrainingAnswer : records
+
+' UserCourse -> UserDeck relationship
+UserCourse "1" -- "*" UserDeck : includes
+
+' UserDeck -> UserCard relationship
+UserDeck "1" -- "*" UserCard : contains
+
+' ===================================
+' DEPENDENCIES (Зависимости сервисов)
+' ===================================
+
+' Handler dependencies on Services
+AuthHandler ..> UserService : uses
+AuthHandler ..> MoodleService : uses
+UserHandler ..> UserService : uses
+UserHandler ..> CourseAccessService : uses
+CourseHandler ..> CourseService : uses
+CourseHandler ..> DeckService : uses
+CourseHandler ..> CardService : uses
+CourseHandler ..> DictionaryService : uses
+CourseHandler ..> CourseAccessService : uses
+DeckHandler ..> DeckService : uses
+DeckHandler ..> CourseService : uses
+DeckHandler ..> CourseAccessService : uses
+CardHandler ..> CardService : uses
+CardHandler ..> UserDeckService : uses
+CardHandler ..> DeckService : uses
+CardHandler ..> CourseService : uses
+CardHandler ..> CourseAccessService : uses
+TrainingSessionHandler ..> TrainingSessionService : uses
+PersonalVocabularyHandler ..> PersonalVocabularyService : uses
+DictionaryHandler ..> DictionaryService : uses
+ReadingTextHandler ..> ReadingTextService : uses
+
+' Service dependencies
+TrainingSessionService ..> CardService : uses
+TrainingSessionService ..> UserDeckService : uses
+TrainingSessionService ..> UserCardService : uses
+
+@enduml

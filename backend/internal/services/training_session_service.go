@@ -11,18 +11,26 @@ import (
 )
 
 type TrainingSessionService struct {
-	db              *pgxpool.Pool
-	cardService     *CardService
-	userDeckService *UserDeckService
-	userCardService *UserCardService
+	db                         *pgxpool.Pool
+	cardService                *CardService
+	userDeckService            *UserDeckService
+	userCardService            *UserCardService
+	personalTranslationService *PersonalWordTranslationService
 }
 
-func NewTrainingSessionService(db *pgxpool.Pool, cardService *CardService, userDeckService *UserDeckService, userCardService *UserCardService) *TrainingSessionService {
+func NewTrainingSessionService(
+	db *pgxpool.Pool,
+	cardService *CardService,
+	userDeckService *UserDeckService,
+	userCardService *UserCardService,
+	personalTranslationService *PersonalWordTranslationService,
+) *TrainingSessionService {
 	return &TrainingSessionService{
-		db:              db,
-		cardService:     cardService,
-		userDeckService: userDeckService,
-		userCardService: userCardService,
+		db:                         db,
+		cardService:                cardService,
+		userDeckService:            userDeckService,
+		userCardService:            userCardService,
+		personalTranslationService: personalTranslationService,
 	}
 }
 

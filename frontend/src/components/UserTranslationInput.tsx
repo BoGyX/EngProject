@@ -1,60 +1,85 @@
 import React, { useEffect, useState } from 'react'
-import { wordTranslationService } from '../services/wordTranslationService'
+import { PersonalTranslation, personalTranslationService } from '../services/personalTranslationService'
 
 interface Props {
   word: string
   autoTranslation?: string
+  onTranslationChange?: (translation: string | null) => void
 }
 
-export default function UserTranslationInput({ word, autoTranslation }: Props) {
+function getLatestTranslation(translations: PersonalTranslation[]): PersonalTranslation | null {
+  if (!translations.length) {
+    return null
+  }
+
+  return [...translations].sort((left, right) => {
+    const leftTime = new Date(left.updated_at || left.created_at).getTime()
+    const rightTime = new Date(right.updated_at || right.created_at).getTime()
+    return rightTime - leftTime
+  })[0]
+}
+
+export default function UserTranslationInput({ word, autoTranslation, onTranslationChange }: Props) {
   const [myTranslation, setMyTranslation] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [savedTranslation, setSavedTranslation] = useState<PersonalTranslation | null>(null)
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
 
   useEffect(() => {
-    if (!word) return
-    setSaved(false)
+    if (!word) {
+      onTranslationChange?.(null)
+      return
+    }
+
     setEditing(false)
     setMyTranslation('')
+    setSavedTranslation(null)
     void loadExisting()
   }, [word])
 
   const loadExisting = async () => {
     try {
-      const existing = await wordTranslationService.get(word)
-      if (existing) {
-        setMyTranslation(existing.translation)
-        setSaved(true)
-      }
+      const existingTranslations = await personalTranslationService.getAll(word)
+      const latestTranslation = getLatestTranslation(existingTranslations)
+
+      setSavedTranslation(latestTranslation)
+      setMyTranslation(latestTranslation?.translation || '')
+      onTranslationChange?.(latestTranslation?.translation || null)
     } catch {
-      // тихо игнорируем
+      onTranslationChange?.(null)
     }
   }
 
   const handleSave = async () => {
-    if (!myTranslation.trim()) return
+    const trimmedTranslation = myTranslation.trim()
+    if (!trimmedTranslation) return
+
     try {
       setLoading(true)
-      await wordTranslationService.upsert(word, myTranslation.trim())
-      setSaved(true)
+      const saved = await personalTranslationService.create(word, trimmedTranslation)
+      setSavedTranslation(saved)
+      setMyTranslation(saved.translation)
       setEditing(false)
+      onTranslationChange?.(saved.translation)
     } catch {
-      // тихо игнорируем
+      // Игнорируем ошибку и оставляем текущее состояние формы
     } finally {
       setLoading(false)
     }
   }
 
   const handleDelete = async () => {
+    if (!savedTranslation) return
+
     try {
       setLoading(true)
-      await wordTranslationService.delete(word)
+      await personalTranslationService.remove(savedTranslation.id)
+      setSavedTranslation(null)
       setMyTranslation('')
-      setSaved(false)
       setEditing(false)
+      onTranslationChange?.(null)
     } catch {
-      // тихо игнорируем
+      // Игнорируем ошибку удаления
     } finally {
       setLoading(false)
     }
@@ -62,13 +87,15 @@ export default function UserTranslationInput({ word, autoTranslation }: Props) {
 
   if (!word) return null
 
+  const isSaved = Boolean(savedTranslation)
+
   return (
     <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-500">Мой перевод</p>
 
-      {saved && !editing ? (
+      {isSaved && !editing ? (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <p className="min-w-0 text-base font-medium text-slate-700">{myTranslation}</p>
+          <p className="min-w-0 text-base font-medium text-slate-700">{savedTranslation?.translation}</p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -91,8 +118,7 @@ export default function UserTranslationInput({ word, autoTranslation }: Props) {
         <div className="mt-2 space-y-2">
           {autoTranslation && (
             <p className="text-xs text-slate-500">
-              Авто: <span className="italic">{autoTranslation}</span>
-              {' '}
+              Авто: <span className="italic">{autoTranslation}</span>{' '}
               <button
                 type="button"
                 onClick={() => setMyTranslation(autoTranslation)}
@@ -122,7 +148,10 @@ export default function UserTranslationInput({ word, autoTranslation }: Props) {
             {editing && (
               <button
                 type="button"
-                onClick={() => { setEditing(false); void loadExisting() }}
+                onClick={() => {
+                  setEditing(false)
+                  void loadExisting()
+                }}
                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
               >
                 Отмена

@@ -4,7 +4,9 @@ import (
 	"english-learning/internal/models"
 	"english-learning/internal/services"
 	"english-learning/internal/utils"
+	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,12 +14,12 @@ import (
 )
 
 type AuthHandler struct {
-	userService   *services.UserService
-	moodleService *services.MoodleService
-	jwtSecret     string
-	jwtExpiry     int
-	moodleEnabled bool
-	moodleOnlyAuth bool
+	userService      *services.UserService
+	moodleService    *services.MoodleService
+	jwtSecret        string
+	jwtExpiry        int
+	moodleEnabled    bool
+	moodleOnlyAuth   bool
 	moodleAutoCreate bool
 }
 
@@ -43,6 +45,46 @@ func (h *AuthHandler) rejectIfMoodleOnly(c *gin.Context, message string) bool {
 		"message": message,
 	})
 	return true
+}
+
+func (h *AuthHandler) findUserForMoodle(moodleUser *services.MoodleUser) (*models.User, error) {
+	if moodleUser == nil {
+		return nil, errors.New("moodle user is required")
+	}
+
+	if moodleUser.Username != "" {
+		user, err := h.userService.GetUserByMoodleLogin(moodleUser.Username)
+		if err == nil {
+			return user, nil
+		}
+	}
+
+	if moodleUser.Email != "" {
+		user, err := h.userService.GetUserByEmail(moodleUser.Email)
+		if err == nil {
+			if moodleUser.Username != "" && user.MoodleLogin == nil {
+				if updateErr := h.userService.UpdateMoodleLogin(user.ID, moodleUser.Username); updateErr == nil {
+					user.MoodleLogin = &moodleUser.Username
+				}
+			}
+			return user, nil
+		}
+	}
+
+	return nil, errors.New("user not found")
+}
+
+func buildMoodleDisplayName(moodleUser *services.MoodleUser) string {
+	if moodleUser == nil {
+		return ""
+	}
+
+	name := strings.TrimSpace(moodleUser.FullName)
+	if name != "" {
+		return name
+	}
+
+	return strings.TrimSpace(moodleUser.FirstName + " " + moodleUser.LastName)
 }
 
 // RegisterRequest запрос на регистрацию
@@ -299,7 +341,7 @@ type MoodleLoginRequest struct {
 func (h *AuthHandler) LoginMoodle(c *gin.Context) {
 	if !h.moodleEnabled || h.moodleService == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "Moodle авторизация отключена",
+			"error":   "Moodle авторизация отключена",
 			"message": "Для включения Moodle авторизации:",
 			"instructions": []string{
 				"1. Создайте файл backend/.env (скопируйте из .env.example если есть)",
@@ -326,7 +368,7 @@ func (h *AuthHandler) LoginMoodle(c *gin.Context) {
 		// Логируем детальную ошибку для отладки
 		println("❌ Moodle login error:", err.Error())
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Неверные учетные данные Moodle",
+			"error":   "Неверные учетные данные Moodle",
 			"details": err.Error(),
 		})
 		return
@@ -334,28 +376,31 @@ func (h *AuthHandler) LoginMoodle(c *gin.Context) {
 
 	moodleUser := moodleResult.User
 	moodleRole := moodleResult.Role
-	
+
 	println("🔐 Moodle login успешен:", moodleUser.Username, "| Email:", moodleUser.Email, "| Role:", moodleRole)
 
-	// Ищем пользователя в локальной БД по email
+	// Ищем пользователя в локальной БД по логину Moodle, затем по email
 	var user *models.User
-	user, err = h.userService.GetUserByEmail(moodleUser.Email)
-	
+	user, err = h.findUserForMoodle(moodleUser)
+
 	// Если пользователь не найден и включено автосоздание, создаем его
 	if err != nil && h.moodleAutoCreate {
 		// Создаем пользователя без пароля (так как авторизация через Moodle)
 		// Используем случайный пароль, который никогда не будет использован
 		randomPassword := uuid.New().String()
-		name := moodleUser.FullName
-		if name == "" {
-			name = moodleUser.FirstName + " " + moodleUser.LastName
-		}
-		user, err = h.userService.CreateUser(moodleUser.Email, randomPassword, name)
+		name := buildMoodleDisplayName(moodleUser)
+		user, err = h.userService.CreateUserWithProfile(services.CreateUserParams{
+			Email:       moodleUser.Email,
+			Password:    randomPassword,
+			Name:        name,
+			Role:        "user",
+			MoodleLogin: moodleUser.Username,
+		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать пользователя"})
 			return
 		}
-		
+
 		// Назначаем роль из Moodle
 		if moodleRole == "admin" {
 			user.Role = "admin"
@@ -426,7 +471,7 @@ func (h *AuthHandler) RegisterMoodle(c *gin.Context) {
 
 	if !h.moodleEnabled || h.moodleService == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "Moodle авторизация отключена",
+			"error":   "Moodle авторизация отключена",
 			"message": "Для включения Moodle регистрации:",
 			"instructions": []string{
 				"1. Создайте файл backend/.env (скопируйте из .env.example если есть)",
@@ -453,30 +498,33 @@ func (h *AuthHandler) RegisterMoodle(c *gin.Context) {
 		// Логируем детальную ошибку для отладки
 		println("❌ Moodle register error:", err.Error())
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Неверные учетные данные Moodle",
+			"error":   "Неверные учетные данные Moodle",
 			"details": err.Error(),
 		})
 		return
 	}
-	
+
 	moodleUser := moodleResult.User
 	moodleRole := moodleResult.Role
-	
-	existingUser, err := h.userService.GetUserByEmail(moodleUser.Email)
+
+	existingUser, err := h.findUserForMoodle(moodleUser)
 	if err == nil && existingUser != nil {
 		// Пользователь уже существует - возвращаем ошибку
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь с таким email уже зарегистрирован. Используйте вход через Moodle."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь с таким Moodle логином или email уже зарегистрирован. Используйте вход через Moodle."})
 		return
 	}
 
 	// Создаем пользователя в локальной БД
 	// Используем случайный пароль, который никогда не будет использован
 	randomPassword := uuid.New().String()
-	name := moodleUser.FullName
-	if name == "" {
-		name = moodleUser.FirstName + " " + moodleUser.LastName
-	}
-	user, err := h.userService.CreateUser(moodleUser.Email, randomPassword, name)
+	name := buildMoodleDisplayName(moodleUser)
+	user, err := h.userService.CreateUserWithProfile(services.CreateUserParams{
+		Email:       moodleUser.Email,
+		Password:    randomPassword,
+		Name:        name,
+		Role:        "user",
+		MoodleLogin: moodleUser.Username,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать пользователя: " + err.Error()})
 		return

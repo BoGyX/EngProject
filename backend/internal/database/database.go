@@ -37,6 +37,11 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 
 	log.Printf("DB connection established")
 
+	if err := ensureUserCompatibility(pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to update users schema: %w", err)
+	}
+
 	if err := ensureCourseCompatibility(pool); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to update courses schema: %w", err)
@@ -73,6 +78,45 @@ func Connect(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+func ensureUserCompatibility(pool *pgxpool.Pool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	log.Println("Checking users schema...")
+
+	compatSQL := `
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name TEXT,
+    moodle_login TEXT,
+    role TEXT CHECK(role IN ('user','admin')) DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS moodle_login TEXT;
+
+UPDATE users
+SET moodle_login = NULL
+WHERE moodle_login IS NOT NULL
+  AND BTRIM(moodle_login) = '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_moodle_login_unique
+    ON users(moodle_login)
+    WHERE moodle_login IS NOT NULL;
+`
+
+	if _, err := pool.Exec(ctx, compatSQL); err != nil {
+		return err
+	}
+
+	log.Println("users schema is up to date")
+	return nil
 }
 
 func ensureCourseCompatibility(pool *pgxpool.Pool) error {

@@ -77,9 +77,25 @@ export interface Podcast {
   updated_at: string
 }
 
+export interface AdminUser {
+  id: string
+  email: string
+  moodle_login?: string
+  name?: string
+  role: string
+  created_at: string
+}
+
 export interface UserCourseAccess {
   user_id: string
   course_ids: number[]
+}
+
+export interface CreateAdminUserRequest {
+  first_name: string
+  last_name: string
+  moodle_login: string
+  password: string
 }
 
 export interface ImportCourseResponse {
@@ -143,6 +159,16 @@ export const adminService = {
   },
 
   // Users
+  async getUsers(): Promise<AdminUser[]> {
+    const response = await api.get<AdminUser[]>('/admin/users')
+    return response.data || []
+  },
+
+  async createUser(data: CreateAdminUserRequest): Promise<AdminUser> {
+    const response = await api.post<AdminUser>('/admin/users', data)
+    return response.data
+  },
+
   async updateUserRole(userId: string, role: 'admin' | 'user') {
     const response = await api.put(`/admin/users/${userId}/role`, { role })
     return response.data

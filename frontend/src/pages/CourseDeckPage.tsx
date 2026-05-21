@@ -120,6 +120,10 @@ function getDisplayedDeckCardCount(totalCards: number, loadedCardsCount: number)
   return Math.max(totalCards || 0, loadedCardsCount || 0)
 }
 
+function normalizeTranslationKey(word: string) {
+  return word.trim().toLowerCase()
+}
+
 export default function CourseDeckPage() {
   const navigate = useNavigate()
   const { user, accessToken, isAuthenticated } = useAuthStore()
@@ -141,6 +145,7 @@ export default function CourseDeckPage() {
   const [loadingCards, setLoadingCards] = useState(false)
   const [showStudyModal, setShowStudyModal] = useState(false)
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null)
+  const [personalTranslations, setPersonalTranslations] = useState<Record<string, string | null>>({})
 
   const deckPresentations = useMemo(
     () => buildDeckPresentations(course, decks, userDecks, activeDeck?.deck_id),
@@ -197,9 +202,11 @@ export default function CourseDeckPage() {
       setLoadingCards(true)
       const loadedCards = await studyService.getCardsByDeck(deckId)
       setCards(loadedCards)
+      setPersonalTranslations({})
     } catch (error) {
       console.error('Error loading cards:', error)
       setCards([])
+      setPersonalTranslations({})
     } finally {
       setLoadingCards(false)
     }
@@ -342,6 +349,27 @@ export default function CourseDeckPage() {
     const normalizedUrl = config.getFullUrl(audioUrl)
     const audio = new Audio(normalizedUrl)
     audio.play().catch((error) => console.error('Error playing audio:', error))
+  }
+
+  const getDisplayedTranslation = (card: Card) => {
+    const personalTranslation = personalTranslations[normalizeTranslationKey(card.word)]
+    return personalTranslation || card.translation
+  }
+
+  const handlePersonalTranslationChange = (word: string, translation: string | null) => {
+    const normalizedWord = normalizeTranslationKey(word)
+    setPersonalTranslations((current) => {
+      if (!translation) {
+        const next = { ...current }
+        delete next[normalizedWord]
+        return next
+      }
+
+      return {
+        ...current,
+        [normalizedWord]: translation,
+      }
+    })
   }
 
   const handleStartStudy = () => {
@@ -727,9 +755,13 @@ export default function CourseDeckPage() {
                                   </button>
                                 )}
                               </div>
-                              <p className="text-base font-medium text-slate-700">{card.translation}</p>
+                              <p className="text-base font-medium text-slate-700">{getDisplayedTranslation(card)}</p>
                               {card.example && <p className="border-l-2 border-link-light pl-3 text-sm italic text-slate-500">{card.example}</p>}
-                              <UserTranslationInput word={card.word} autoTranslation={card.translation} />
+                              <UserTranslationInput
+                                word={card.word}
+                                autoTranslation={card.translation}
+                                onTranslationChange={(translation) => handlePersonalTranslationChange(card.word, translation)}
+                              />
                             </div>
                             {card.image_url && (
                               <img

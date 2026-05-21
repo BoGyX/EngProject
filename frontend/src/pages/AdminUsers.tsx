@@ -1,21 +1,30 @@
-import { useEffect, useMemo, useState } from 'react'
-import { adminService, Course } from '../services/adminService'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { adminService, AdminUser, Course } from '../services/adminService'
 import { useAuthStore } from '../store/authStore'
-import api from '../services/api'
-
-interface User {
-  id: string
-  email: string
-  name?: string
-  role: string
-  created_at: string
-}
 
 const USERS_PER_PAGE = 10
 
+type CreateUserFormState = {
+  firstName: string
+  lastName: string
+  moodleLogin: string
+  password: string
+}
+
+const initialCreateUserForm: CreateUserFormState = {
+  firstName: '',
+  lastName: '',
+  moodleLogin: '',
+  password: '',
+}
+
+function getErrorMessage(error: any, fallback: string) {
+  return error?.response?.data?.error || fallback
+}
+
 export default function AdminUsers() {
   const { user } = useAuthStore()
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
@@ -25,6 +34,10 @@ export default function AdminUsers() {
   const [loadingAccessUserId, setLoadingAccessUserId] = useState<string | null>(null)
   const [savingRoleUserId, setSavingRoleUserId] = useState<string | null>(null)
   const [savingAccessUserId, setSavingAccessUserId] = useState<string | null>(null)
+  const [createUserForm, setCreateUserForm] = useState<CreateUserFormState>(initialCreateUserForm)
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [createUserError, setCreateUserError] = useState('')
+  const [createUserSuccess, setCreateUserSuccess] = useState('')
 
   useEffect(() => {
     if (user?.role !== 'admin') return
@@ -38,8 +51,8 @@ export default function AdminUsers() {
   const loadUsersAndCourses = async () => {
     try {
       setLoading(true)
-      const [usersResponse, courses] = await Promise.all([api.get<User[]>('/users'), adminService.getAllCourses()])
-      setUsers(usersResponse.data)
+      const [loadedUsers, courses] = await Promise.all([adminService.getUsers(), adminService.getAllCourses()])
+      setUsers(loadedUsers)
       setAvailableCourses(courses || [])
     } catch (error) {
       console.error('Error loading users:', error)
@@ -49,8 +62,36 @@ export default function AdminUsers() {
     }
   }
 
+  const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    try {
+      setCreatingUser(true)
+      setCreateUserError('')
+      setCreateUserSuccess('')
+
+      const createdUser = await adminService.createUser({
+        first_name: createUserForm.firstName.trim(),
+        last_name: createUserForm.lastName.trim(),
+        moodle_login: createUserForm.moodleLogin.trim(),
+        password: createUserForm.password,
+      })
+
+      setUsers((current) => [createdUser, ...current])
+      setCreateUserForm(initialCreateUserForm)
+      setCreateUserSuccess('Пользователь создан.')
+      setCurrentPage(1)
+    } catch (error) {
+      console.error('Error creating user:', error)
+      setCreateUserError(getErrorMessage(error, 'Не удалось создать пользователя.'))
+    } finally {
+      setCreatingUser(false)
+    }
+  }
+
   const handleChangeRole = async (targetUserId: string, newRole: string) => {
     if (!confirm(`Изменить роль пользователя на "${newRole}"?`)) return
+
     try {
       setSavingRoleUserId(targetUserId)
       const updatedUser = await adminService.updateUserRole(targetUserId, newRole as 'admin' | 'user')
@@ -102,7 +143,7 @@ export default function AdminUsers() {
 
       return {
         ...current,
-        [targetUserId]: Array.from(selected),
+        [targetUserId]: Array.from(selected).sort((left, right) => left - right),
       }
     })
   }
@@ -130,7 +171,8 @@ export default function AdminUsers() {
     return users.filter((item) => {
       const email = item.email.toLowerCase()
       const name = (item.name || '').toLowerCase()
-      return email.includes(query) || name.includes(query)
+      const moodleLogin = (item.moodle_login || '').toLowerCase()
+      return email.includes(query) || name.includes(query) || moodleLogin.includes(query)
     })
   }, [searchQuery, users])
 
@@ -231,7 +273,7 @@ export default function AdminUsers() {
           disabled={currentPage === totalPages}
           className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-text-light transition-colors hover:border-rose-200 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Вперед
+          Вперёд
         </button>
       </div>
     )
@@ -255,13 +297,13 @@ export default function AdminUsers() {
                 Admin Users
               </span>
               <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
-                Поиск и роли
+                Пользователи и доступы
               </span>
             </div>
             <div>
               <h1 className="text-3xl font-bold text-text-light lg:text-4xl">Управление пользователями</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                Здесь собраны все пользователи платформы. Можно быстро найти человека по имени или email и отследить текущую роль.
+                Здесь можно создать пользователя Moodle, выдать ему роль и назначить доступ к нужным курсам.
               </p>
             </div>
           </div>
@@ -269,35 +311,126 @@ export default function AdminUsers() {
           <div className="rounded-[24px] border border-rose-100 bg-white/80 p-6 shadow-lg">
             <p className="text-xs uppercase tracking-[0.18em] text-rose-500">Сводка</p>
             <p className="mt-3 text-3xl font-bold text-text-light">{users.length}</p>
-            <p className="mt-2 text-sm text-slate-600">{searchQuery ? `Найдено по фильтру: ${filteredUsers.length}` : 'Всего пользователей в системе'}</p>
+            <p className="mt-2 text-sm text-slate-600">
+              {searchQuery ? `Найдено по фильтру: ${filteredUsers.length}` : 'Всего пользователей в системе'}
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Поиск по имени или email..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-2xl border border-gray-300 px-4 py-3 pl-12 focus:border-link-light focus:outline-none"
-          />
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 transform text-slate-400">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="rounded-[28px] border border-gray-200 bg-card-light p-4 shadow-md sm:p-6">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Поиск по имени, Moodle логину или email..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="w-full rounded-2xl border border-gray-300 px-4 py-3 pl-12 focus:border-link-light focus:outline-none"
+            />
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 transform text-slate-400">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 transform text-slate-400 transition-colors hover:text-slate-600"
+                title="Очистить поиск"
+              >
+                ×
+              </button>
+            )}
           </div>
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 transform text-slate-400 transition-colors hover:text-slate-600"
-              title="Очистить поиск"
-            >
-              ×
-            </button>
-          )}
         </div>
+
+        <section className="rounded-[28px] border border-rose-100 bg-white p-5 shadow-md sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-rose-500">Новый пользователь</p>
+              <h2 className="mt-2 text-xl font-semibold text-text-light">Создать вручную</h2>
+            </div>
+          </div>
+
+          <form className="mt-5 space-y-4" onSubmit={handleCreateUser}>
+            {createUserError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{createUserError}</div>
+            )}
+            {createUserSuccess && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {createUserSuccess}
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-text-light">Имя</span>
+                <input
+                  type="text"
+                  required
+                  value={createUserForm.firstName}
+                  onChange={(event) => {
+                    setCreateUserSuccess('')
+                    setCreateUserForm((current) => ({ ...current, firstName: event.target.value }))
+                  }}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-link-light focus:outline-none"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-text-light">Фамилия</span>
+                <input
+                  type="text"
+                  required
+                  value={createUserForm.lastName}
+                  onChange={(event) => {
+                    setCreateUserSuccess('')
+                    setCreateUserForm((current) => ({ ...current, lastName: event.target.value }))
+                  }}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-link-light focus:outline-none"
+                />
+              </label>
+            </div>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-text-light">Логин Moodle</span>
+              <input
+                type="text"
+                required
+                value={createUserForm.moodleLogin}
+                onChange={(event) => {
+                  setCreateUserSuccess('')
+                  setCreateUserForm((current) => ({ ...current, moodleLogin: event.target.value }))
+                }}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-link-light focus:outline-none"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-text-light">Пароль</span>
+              <input
+                type="password"
+                minLength={6}
+                required
+                value={createUserForm.password}
+                onChange={(event) => {
+                  setCreateUserSuccess('')
+                  setCreateUserForm((current) => ({ ...current, password: event.target.value }))
+                }}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-link-light focus:outline-none"
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={creatingUser}
+              className="w-full rounded-2xl bg-link-light px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-link-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {creatingUser ? 'Создаю...' : 'Создать пользователя'}
+            </button>
+          </form>
+        </section>
       </section>
 
       <section className="grid gap-4">
@@ -320,6 +453,7 @@ export default function AdminUsers() {
                       {item.role === 'admin' ? 'Администратор' : 'Пользователь'}
                     </span>
                   </div>
+                  {item.moodle_login && <p className="text-sm text-slate-700">Moodle: {item.moodle_login}</p>}
                   <p className="text-sm text-slate-600">{item.email}</p>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
                     Регистрация: {new Date(item.created_at).toLocaleDateString('ru-RU')}

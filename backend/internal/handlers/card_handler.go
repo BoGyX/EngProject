@@ -5,17 +5,19 @@ import (
 	"english-learning/internal/services"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type CardHandler struct {
-	cardService         *services.CardService
-	userDeckService     *services.UserDeckService
-	deckService         *services.DeckService
-	courseService       *services.CourseService
-	courseAccessService *services.CourseAccessService
+	cardService                *services.CardService
+	userDeckService            *services.UserDeckService
+	deckService                *services.DeckService
+	courseService              *services.CourseService
+	courseAccessService        *services.CourseAccessService
+	personalTranslationService *services.PersonalWordTranslationService
 }
 
 func NewCardHandler(
@@ -24,13 +26,15 @@ func NewCardHandler(
 	deckService *services.DeckService,
 	courseService *services.CourseService,
 	courseAccessService *services.CourseAccessService,
+	personalTranslationService *services.PersonalWordTranslationService,
 ) *CardHandler {
 	return &CardHandler{
-		cardService:         cardService,
-		userDeckService:     userDeckService,
-		deckService:         deckService,
-		courseService:       courseService,
-		courseAccessService: courseAccessService,
+		cardService:                cardService,
+		userDeckService:            userDeckService,
+		deckService:                deckService,
+		courseService:              courseService,
+		courseAccessService:        courseAccessService,
+		personalTranslationService: personalTranslationService,
 	}
 }
 
@@ -98,6 +102,11 @@ func (h *CardHandler) GetAllCards(c *gin.Context) {
 			return
 		}
 
+		if err := h.applyPersonalTranslationsFromContext(c, cards); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		c.JSON(http.StatusOK, cards)
 		return
 	}
@@ -110,6 +119,11 @@ func (h *CardHandler) GetAllCards(c *gin.Context) {
 	cards, err := h.cardService.GetAllCards()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.applyPersonalTranslationsFromContext(c, cards); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -141,6 +155,11 @@ func (h *CardHandler) GetCardByID(c *gin.Context) {
 		return
 	}
 	if !ensureCourseAccess(c, h.courseAccessService, course) {
+		return
+	}
+
+	if err := h.applyPersonalTranslationsFromContext(c, card); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -306,4 +325,69 @@ func (h *CardHandler) DeleteCard(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Card deleted successfully"})
+}
+
+func (h *CardHandler) applyPersonalTranslationsFromContext(c *gin.Context, target any) error {
+	if h.personalTranslationService == nil {
+		return nil
+	}
+
+	userID, err := getRequestUserID(c)
+	if err != nil || userID == nil {
+		return err
+	}
+
+	switch value := target.(type) {
+	case []models.Card:
+		return h.applyPersonalTranslationsToCards(*userID, value)
+	case *models.Card:
+		return h.applyPersonalTranslationToCard(*userID, value)
+	default:
+		return nil
+	}
+}
+
+func (h *CardHandler) applyPersonalTranslationsToCards(userID uuid.UUID, cards []models.Card) error {
+	if len(cards) == 0 {
+		return nil
+	}
+
+	words := make([]string, 0, len(cards))
+	for _, card := range cards {
+		words = append(words, card.Word)
+	}
+
+	translationMap, err := h.personalTranslationService.GetLatestTranslationMap(userID, words)
+	if err != nil {
+		return err
+	}
+
+	for index := range cards {
+		if translation, exists := translationMap[normalizeTranslationWord(cards[index].Word)]; exists {
+			cards[index].Translation = translation
+		}
+	}
+
+	return nil
+}
+
+func (h *CardHandler) applyPersonalTranslationToCard(userID uuid.UUID, card *models.Card) error {
+	if card == nil {
+		return nil
+	}
+
+	translationMap, err := h.personalTranslationService.GetLatestTranslationMap(userID, []string{card.Word})
+	if err != nil {
+		return err
+	}
+
+	if translation, exists := translationMap[normalizeTranslationWord(card.Word)]; exists {
+		card.Translation = translation
+	}
+
+	return nil
+}
+
+func normalizeTranslationWord(word string) string {
+	return strings.ToLower(strings.TrimSpace(word))
 }
