@@ -1,0 +1,155 @@
+№	Файл	Описание
+1	.codereportignore	Исключения для code report
+2	.dockerignore	Исключения из Docker-контекста
+3	.env.example	Пример переменных окружения
+4	.gitignore	Исключения для Git
+5	CONFIGURATION.md	Описание настроек проекта
+6	SETUP.md	Инструкция по запуску
+7	backend\.air.docker.toml	Air-конфиг для Docker dev
+8	backend\.air.toml	Air-конфиг для локальной разработки
+9	backend\.dockerignore	Исключения Docker для backend
+10	backend\Dockerfile	Docker-образ backend
+11	backend\README.md	Краткое описание backend
+12	backend\add_security.py	Python-скрипт для security-правок
+13	backend\add_security.sh	Shell-скрипт для security-правок
+14	backend\docs\docs.go	Сгенерированный Swagger Go-файл
+15	backend\docs\swagger.json	Swagger API в JSON
+16	backend\docs\swagger.yaml	Swagger API в YAML
+17	backend\go.mod	Go-модули и зависимости
+18	backend\go.sum	Хеши Go-зависимостей
+19	backend\internal\config\config.go	Загрузка конфигурации backend
+20	backend\internal\database\database.go	Подключение к PostgreSQL
+21	backend\internal\handlers\access_helper.go	Проверка доступа к курсу
+22	backend\internal\handlers\auth_handler.go	HTTP-обработчики авторизации
+23	backend\internal\handlers\card_handler.go	HTTP-обработчики карточек
+24	backend\internal\handlers\card_handler.go.6062700582073040352	Временная копия card_handler.go
+25	backend\internal\handlers\course_handler.go	HTTP-обработчики курсов
+26	backend\internal\handlers\course_import_handler.go	Импорт курса из файла
+27	backend\internal\handlers\course_public_handler.go	Публичная выдача курсов
+28	backend\internal\handlers\deck_handler.go	HTTP-обработчики подкурсов
+29	backend\internal\handlers\dictionary_handler.go	HTTP-обработчик словаря
+30	backend\internal\handlers\greeting.go	Тестовый greeting endpoint
+31	backend\internal\handlers\handlers.go	Заглушка пакета handlers
+32	backend\internal\handlers\personal_vocabulary_handler.go	HTTP-обработчики личного словаря
+33	backend\internal\handlers\personal_word_translation_handler.go	HTTP-обработчики личных переводов
+34	backend\internal\handlers\reading_text_handler.go	HTTP-обработчики reader-текстов
+35	backend\internal\handlers\training_session_handler.go	HTTP-обработчики тренировок
+36	backend\internal\handlers\training_session_handler.go.8920432853459395193	Временная копия training_session_handler.go
+37	backend\internal\handlers\upload_handler.go	HTTP-обработчики загрузки файлов
+38	backend\internal\handlers\user_card_handler.go	HTTP-обработчики прогресса карточек
+39	backend\internal\handlers\user_card_handler.go.423380712564279770	Временная копия user_card_handler.go
+40	backend\internal\handlers\user_course_handler.go	HTTP-обработчики прогресса курсов
+41	backend\internal\handlers\user_deck_handler.go	HTTP-обработчики прогресса подкурсов
+42	backend\internal\handlers\user_handler.go	HTTP-обработчики пользователей
+43	backend\internal\middleware\admin.go	Проверка роли администратора
+44	backend\internal\middleware\auth.go	JWT-аутентификация запросов
+45	backend\internal\middleware\cors.go	CORS-настройки API
+46	backend\internal\middleware\optional_auth.go	Необязательная аутентификация
+47	backend\internal\models\card.go	Модель карточки слова
+48	backend\internal\models\course.go	Модель курса
+49	backend\internal\models\course.go.5587085092458085549	Временная копия course.go
+50	backend\internal\models\course_access.go	Модель доступа к курсу
+51	backend\internal\models\deck.go	Модель подкурса
+52	backend\internal\models\deck.go.5674832142851704861	Временная копия deck.go
+53	backend\internal\models\personal_vocabulary.go	Модель личного словаря
+54	backend\internal\models\personal_word_translation.go	Модель личного перевода
+55	backend\internal\models\reading_text.go	Модель reader-текста
+56	backend\internal\models\refresh_token.go	Модель refresh-токена
+57	backend\internal\models\training_session.go	Модель сессии тренировки
+58	backend\internal\models\training_session.go.357173159203501030	Временная копия training_session.go
+59	backend\internal\models\user.go	Модель пользователя
+60	backend\internal\models\user_card.go	Модель прогресса карточки
+61	backend\internal\models\user_card.go.1998847304194420809	Временная копия user_card.go
+62	backend\internal\models\user_course.go	Модель прогресса курса
+63	backend\internal\models\user_course.go.7563288872498278130	Временная копия user_course.go
+64	backend\internal\models\user_deck.go	Модель прогресса подкурса
+65	backend\internal\models\user_deck.go.544037637488749409	Временная копия user_deck.go
+66	backend\internal\services\card_service.go	Сервис карточек
+67	backend\internal\services\card_service.go.4688190291895208121	Временная копия card_service.go
+68	backend\internal\services\course_access_service.go	Сервис доступа к курсам
+69	backend\internal\services\course_progress_lock.go	Блокировка перехода между курсами
+70	backend\internal\services\course_service.go	Сервис курсов
+71	backend\internal\services\course_service.go.6181541923140038485	Временная копия course_service.go
+72	backend\internal\services\deck_service.go	Сервис подкурсов
+73	backend\internal\services\deck_service.go.392380179979986409	Временная копия deck_service.go
+74	backend\internal\services\dictionary_service.go	Сервис словарного API
+75	backend\internal\services\moodle_service.go	Сервис интеграции Moodle
+76	backend\internal\services\personal_vocabulary_service.go	Сервис личного словаря
+77	backend\internal\services\personal_word_translation_service.go	Сервис личных переводов
+78	backend\internal\services\reading_text_service.go	Сервис reader-текстов
+79	backend\internal\services\training_session_flow.go	Логика очереди тренировки
+80	backend\internal\services\training_session_flow.go.5528542091187982025	Временная копия training_session_flow.go
+81	backend\internal\services\training_session_flow.go.6168596279178481210	Временная копия training_session_flow.go
+82	backend\internal\services\training_session_flow_test.go	Тесты логики тренировки
+83	backend\internal\services\training_session_service.go	Сервис тренировочных сессий
+84	backend\internal\services\training_session_service.go.4534557101603102065	Временная копия training_session_service.go
+85	backend\internal\services\user_card_service.go	Сервис прогресса карточек
+86	backend\internal\services\user_card_service.go.5538009127079192309	Временная копия user_card_service.go
+87	backend\internal\services\user_course_service.go	Сервис прогресса курсов
+88	backend\internal\services\user_course_service.go.8905361165648585860	Временная копия user_course_service.go
+89	backend\internal\services\user_deck_service.go	Сервис прогресса подкурсов
+90	backend\internal\services\user_deck_service.go.1316172524803273419	Временная копия user_deck_service.go
+91	backend\internal\services\user_service.go	Сервис пользователей
+92	backend\internal\utils\jwt.go	Работа с JWT
+93	backend\internal\utils\password.go	Хеширование паролей
+94	backend\internal\utils\slug.go	Генерация slug
+95	backend\main.go	Точка входа backend
+96	backend\main.go.3796463323045584938	Временная копия main.go
+97	class_diagram.puml	Исходник UML-диаграммы
+98	db_all_scripts.txt	Сборник SQL-скриптов
+99	diagrams\project_structure.drawio	Диаграмма структуры проекта
+100	diagrams\testing_schema.drawio	Диаграмма схемы тестирования
+101	diagrams\use_case_diagram.drawio	Диаграмма use case
+102	docker-compose.dev.yml	Docker Compose для dev
+103	docker-compose.yml	Основной Docker Compose
+104	frontend\.dockerignore	Исключения Docker для frontend
+105	frontend\.env.example	Пример env для frontend
+106	frontend\Dockerfile	Docker-образ frontend
+107	frontend\index.html	HTML-шаблон frontend
+108	frontend\package.json	NPM-скрипты и зависимости
+109	frontend\postcss.config.js	Конфиг PostCSS
+110	frontend\server.js	Node-сервер для frontend build
+111	frontend\src\App.tsx	Роуты приложения
+112	frontend\src\components\FileUpload.tsx	Компонент загрузки файлов
+113	frontend\src\components\Layout.tsx	Общий layout и меню
+114	frontend\src\components\StudyCards.tsx	Старый компонент обучения
+115	frontend\src\components\StudySessionModal.tsx	Модалка тренировки слов
+116	frontend\src\components\UserTranslationInput.tsx	Ввод личного перевода
+117	frontend\src\components\WordTranslator.tsx	Всплывающий переводчик слова
+118	frontend\src\config.ts	Runtime-конфиг frontend
+119	frontend\src\index.css	Глобальные стили
+120	frontend\src\main.tsx	Точка входа frontend
+121	frontend\src\pages\AdminCourses.tsx	Страница управления курсами
+122	frontend\src\pages\AdminDashboard.tsx	Главная страница админки
+123	frontend\src\pages\AdminDecks.tsx	Страница управления подкурсами и карточками
+124	frontend\src\pages\AdminPodcasts.tsx	Страница подкастов админки
+125	frontend\src\pages\AdminUsers.tsx	Страница управления пользователями
+126	frontend\src\pages\CourseDeckPage.tsx	Страница курса и подкурсов
+127	frontend\src\pages\CourseDetail.tsx	Старая страница курса
+128	frontend\src\pages\Courses.tsx	Список курсов
+129	frontend\src\pages\Login.tsx	Страница входа
+130	frontend\src\pages\Progress.tsx	Страница прогресса обучения
+131	frontend\src\pages\ReadText.tsx	Старая страница reader
+132	frontend\src\pages\Reader.tsx	Список reader-текстов
+133	frontend\src\pages\ReaderTextPage.tsx	Страница чтения текста
+134	frontend\src\pages\Register.tsx	Страница регистрации/редирект
+135	frontend\src\pages\Vocabulary.tsx	Старая страница словаря
+136	frontend\src\pages\VocabularyDeckPage.tsx	Текущая страница словаря
+137	frontend\src\services\adminService.ts	API-сервис админки
+138	frontend\src\services\api.ts	Общий HTTP-клиент Axios
+139	frontend\src\services\authService.ts	API-сервис авторизации
+140	frontend\src\services\dictionaryService.ts	API-сервис словаря
+141	frontend\src\services\personalTranslationService.ts	API-сервис личных переводов
+142	frontend\src\services\studyService.ts	API-сервис обучения
+143	frontend\src\services\uploadService.ts	API-сервис загрузок
+144	frontend\src\services\vocabularyService.ts	API-сервис словаря пользователя
+145	frontend\src\services\wordTranslationService.ts	API-сервис перевода слов
+146	frontend\src\store\authStore.ts	Zustand-store авторизации
+147	frontend\src\utils\courseProgress.ts	Хелперы прогресса курса
+148	frontend\src\utils\slug.ts	Хелпер генерации slug
+149	frontend\src\utils\trainingModes.ts	Хелперы режимов тренировки
+150	frontend\src\vite-env.d.ts	Типы окружения Vite
+151	frontend\tailwind.config.js	Конфиг Tailwind CSS
+152	frontend\tsconfig.json	Основной TypeScript-конфиг
+153	frontend\tsconfig.node.json	TypeScript-конфиг для Node/Vite
+154	frontend\vite.config.ts	Конфиг Vite

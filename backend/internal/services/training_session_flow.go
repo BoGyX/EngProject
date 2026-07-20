@@ -294,6 +294,9 @@ func (s *TrainingSessionService) SubmitScopedAnswer(userID uuid.UUID, sessionID 
 		return nil, false, err
 	}
 
+	// Исправление 3: карточка сессии завершается всегда (чтобы перейти к следующей),
+	// но вариация помечается выполненной только при правильном ответе.
+	// При неправильном ответе mode остаётся false — в следующей сессии та же вариация повторится.
 	if err := s.updateTrainingSessionCard(ctx, tx, sessionCard.ID, currentMode, progress, true, &isCorrect, boolToInt(isCorrect), boolToInt(!isCorrect)); err != nil {
 		return nil, false, err
 	}
@@ -635,44 +638,55 @@ func buildTrainingQueueForBatch(plans []trainingSessionCardPlan) []trainingSessi
 		return []trainingSessionQueueEntry{}
 	}
 
-	randomizedPlans := append([]trainingSessionCardPlan(nil), plans...)
-	shuffleTrainingCardPlans(randomizedPlans)
-
-	studyQueue := make([]trainingSessionQueueEntry, 0, len(randomizedPlans))
-	for _, plan := range randomizedPlans {
+	// Исправление 1: view идёт строго по порядку позиции — НЕ перемешиваем
+	studyQueue := make([]trainingSessionQueueEntry, 0, len(plans))
+	for _, plan := range plans {
 		if plan.Card == nil || !hasTrainingMode(plan.Modes, "view") {
 			continue
 		}
-
 		studyQueue = append(studyQueue, trainingSessionQueueEntry{
 			CardID:   plan.Card.ID,
 			Mode:     "view",
 			Progress: plan.Progress,
 		})
 	}
+	if len(studyQueue) > 0 {
+		return studyQueue
+	}
 
-	practicePlans := make([]trainingSessionCardPlan, 0, len(randomizedPlans))
+	// Исправление 2: на этапе закрепления — одно слово, одна случайная вариация
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	for _, plan := range randomizedPlans {
+	practicePlans := make([]trainingSessionCardPlan, 0, len(plans))
+	for _, plan := range plans {
 		if plan.Card == nil || len(plan.Modes) == 0 {
 			continue
 		}
-
 		practiceModes := excludeTrainingMode(plan.Modes, "view")
 		if len(practiceModes) == 0 {
 			continue
 		}
-
+		// Выбираем одну случайную незавершённую вариацию для этого слова
+		chosenMode := practiceModes[r.Intn(len(practiceModes))]
 		practicePlans = append(practicePlans, trainingSessionCardPlan{
 			Card:     plan.Card,
 			UserCard: plan.UserCard,
-			Modes:    practiceModes,
+			Modes:    []string{chosenMode},
 			Progress: plan.Progress,
 		})
 	}
 
-	queue := append([]trainingSessionQueueEntry{}, studyQueue...)
-	queue = append(queue, buildMixedPracticeQueue(practicePlans)...)
+	// Перемешиваем порядок слов
+	shuffleTrainingCardPlans(practicePlans)
+
+	queue := make([]trainingSessionQueueEntry, 0, len(practicePlans))
+	for _, plan := range practicePlans {
+		queue = append(queue, trainingSessionQueueEntry{
+			CardID:   plan.Card.ID,
+			Mode:     plan.Modes[0],
+			Progress: plan.Progress,
+		})
+	}
 
 	return queue
 }
